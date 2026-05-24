@@ -1,19 +1,17 @@
-name: UI CI and ECR Push
+name: UI CI and GHCR Push
 
 on:
   push:
-    branches: [ "demo-intelligence" ]
+    branches: [ "devops/uhis-958" ]
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
   packages: write
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ vars.AWS_ECR_REPO }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -35,38 +33,35 @@ jobs:
     - name: Build
       run: npm run build
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
       with:
-        role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.AWS_ROLE }}
-        aws-region: ${{ env.AWS_REGION }}
-
-    - name: Login to Amazon ECR
-      uses: aws-actions/amazon-ecr-login@v2
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build, Tag & Push Image
       run: |
-        ECR_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}
-        docker build -t ${ECR_URI}:latest .
-        docker tag ${ECR_URI}:latest ${ECR_URI}:${IMAGE_TAG}
-        docker push ${ECR_URI}:${IMAGE_TAG}
-        docker push ${ECR_URI}:latest
+        IMAGE_URI=${REGISTRY}/${IMAGE_NAME}
+        docker build -t ${IMAGE_URI}:latest .
+        docker tag ${IMAGE_URI}:latest ${IMAGE_URI}:${IMAGE_TAG}
+        docker push ${IMAGE_URI}:${IMAGE_TAG}
+        docker push ${IMAGE_URI}:latest
 
-  trigger-deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/demo-intelligence' && success()
-    env:
-      GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
-    steps:
-      - name: Trigger deploy-scripts workflow_dispatch
-        run: |
-          gh api --method POST \
-            /repos/openphc/deploy-scripts/actions/workflows/deploy.yml/dispatches \
-            --input - <<'JSON'
-          {
-            "ref": "main",
-            "inputs": { "target_env": "dev" }
-          }
-          JSON
- 
+  # trigger-deploy:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/demo-intelligence' && success()
+  #   env:
+  #     GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+  #   steps:
+  #     - name: Trigger deploy-scripts workflow_dispatch
+  #       run: |
+  #         gh api --method POST \
+  #           /repos/openphc/deploy-scripts/actions/workflows/deploy.yml/dispatches \
+  #           --input - <<'JSON'
+  #         {
+  #           "ref": "main",
+  #           "inputs": { "target_env": "dev" }
+  #         }
+  #         JSON
