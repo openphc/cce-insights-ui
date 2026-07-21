@@ -46,6 +46,14 @@ function getSourceColor(source: string): string {
   return SOURCE_COLORS[source.toLowerCase()] ?? 'bg-gray-100 text-gray-700';
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  spice: 'chw',
+};
+
+function getSourceLabel(source: string): string {
+  return SOURCE_LABELS[source.toLowerCase()] ?? source;
+}
+
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const patientId = id ?? '';
@@ -313,7 +321,7 @@ export default function PatientDetail() {
                             )}
                             {step.source && (
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getSourceColor(step.source)}`}>
-                                {step.source}
+                                {getSourceLabel(step.source)}
                               </span>
                             )}
                             {step.practitioner && (
@@ -358,7 +366,7 @@ export default function PatientDetail() {
                             <td className="py-2 pr-4">
                               {step.source ? (
                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getSourceColor(step.source)}`}>
-                                  {step.source}
+                                  {getSourceLabel(step.source)}
                                 </span>
                               ) : '—'}
                             </td>
@@ -393,7 +401,7 @@ export default function PatientDetail() {
                             <td className="py-2 pr-4">
                               {step.source ? (
                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getSourceColor(step.source)}`}>
-                                  {step.source}
+                                  {getSourceLabel(step.source)}
                                 </span>
                               ) : '—'}
                             </td>
