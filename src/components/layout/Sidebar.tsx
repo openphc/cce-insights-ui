@@ -31,7 +31,7 @@ export function Sidebar() {
         <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center">
           <span className="text-xs font-bold text-white">C</span>
         </div>
-        <span className="text-sm font-bold text-gray-900">CHW Care Coordination Insights</span>
+        <span className="text-sm font-bold text-gray-900">CHW App Care Coordination Insights</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">

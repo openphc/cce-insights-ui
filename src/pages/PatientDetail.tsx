@@ -47,7 +47,7 @@ function getSourceColor(source: string): string {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  spice: 'chw',
+  spice: 'CHW App',
 };
 
 function getSourceLabel(source: string): string {
