@@ -6,7 +6,7 @@ import { DateRangeFilter } from './components/shared/DateRangeFilter';
 import { DistrictFilter } from './components/shared/DistrictFilter';
 import { FacilityFilter } from './components/shared/FacilityFilter';
 import { authEnabled, logout } from './auth/keycloak';
-import mohLogo from './assets/rwanda-moh-logo-full.png';
+import mohLogo from './assets/rwanda-national-coat-of-arms.png';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ComplianceOverview = lazy(() => import('./pages/ComplianceOverview'));
@@ -28,10 +28,11 @@ export function App() {
       <div className="ml-56 flex-1">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 bg-[#1d5fae] px-6 py-2.5">
           <div className="flex items-center gap-3">
-            <img src={mohLogo} alt="Republic of Rwanda — Ministry of Health" className="h-9 w-9 rounded-full bg-white object-contain p-0.5" />
+            <img src={mohLogo} alt="Republic of Rwanda — Ministry of Health" className="h-14 w-14 object-contain" />
             <div className="flex flex-col leading-tight">
-              <span className="text-xs text-blue-100">Republic of Rwanda</span>
-              <span className="text-base font-bold text-white">Care Coordination Engine</span>
+              <span className="text-base font-bold text-white">Republic of Rwanda</span>
+              <span className="text-xs text-blue-100">Ministry of Health</span>
+              <span className="text-xs text-blue-100">Care Coordination Engine</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
