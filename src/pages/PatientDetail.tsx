@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { PageHeader } from '../components/shared/PageHeader';
 import { Card } from '../components/shared/Card';
@@ -124,6 +124,51 @@ export default function PatientDetail() {
   const patientId = id ?? '';
   const [selectedProtocolInstanceId, setSelectedProtocolInstanceId] = useState<string | null>(null);
   const [hasSetDefaultSelection, setHasSetDefaultSelection] = useState(false);
+  const [protocolSearch, setProtocolSearch] = useState('');
+
+  // The Protocols panel sticks just below the patient title block, whose
+  // height isn't fixed (it wraps, resizes with the viewport, etc.) — measure
+  // it directly instead of guessing a Tailwind spacing scale value, which
+  // drifted out of sync and let the title block's opaque background cover
+  // the panel's own header while scrolling.
+  const titleBlockRef = useRef<HTMLDivElement>(null);
+  const [protocolsTopPx, setProtocolsTopPx] = useState(176);
+  useLayoutEffect(() => {
+    const el = titleBlockRef.current;
+    if (!el) return;
+    // Only a sub-pixel safety margin — the Card's sticky top must match the
+    // title block's stuck bottom edge almost exactly. Too little and the
+    // panel's header gets covered once both are stuck; too much and the
+    // panel sits detectably lower than its sibling column even at rest,
+    // because `position: sticky` enforces its `top` value immediately
+    // whenever the element's natural position would otherwise be higher.
+    const GAP_PX = 4;
+    const measure = () => {
+      // Read the element's own resolved `top` (from lg:top-14) rather than
+      // assuming its pixel value — it depends on the root font size, which
+      // browser zoom/accessibility text-size settings can change.
+      const resolvedTop = parseFloat(getComputedStyle(el).top);
+      const titleBlockScreenOffsetPx = Number.isFinite(resolvedTop) ? resolvedTop : 56;
+      setProtocolsTopPx(titleBlockScreenOffsetPx + el.offsetHeight + GAP_PX);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Applied via inline style (not a Tailwind class) so the sticky `top`
+  // is gated to desktop widths without depending on a CSS custom property —
+  // matches the `lg:` breakpoint used everywhere else on this page.
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   // Step Details stays collapsed under the selected protocol until its own
   // toggle is clicked — picking a protocol shouldn't also dump the raw step
   // table.
@@ -141,6 +186,23 @@ export default function PatientDetail() {
     () => reorderByRequestedProtocol(timeline.data?.protocols ?? [], requestedProtocolInstanceId),
     [timeline.data, requestedProtocolInstanceId]
   );
+
+  // Filters the (already-pinned) list by title, canonical URL or status — the
+  // Protocols panel can otherwise hold dozens of entries with nothing but a
+  // scrollbar to find one.
+  const visibleProtocols = useMemo(() => {
+    const query = protocolSearch.trim().toLowerCase();
+    if (!query) return orderedProtocols;
+    return orderedProtocols.filter((proto) => {
+      const trackingMatch = tracking.data?.find((t) => t.protocolInstanceId === proto.protocolInstanceId);
+      const title = trackingMatch?.protocolTitle || proto.protocolCanonical;
+      return (
+        title.toLowerCase().includes(query) ||
+        proto.protocolCanonical.toLowerCase().includes(query) ||
+        proto.status.toLowerCase().includes(query)
+      );
+    });
+  }, [orderedProtocols, protocolSearch, tracking.data]);
 
   // On first load, select whichever protocol the user actually came here
   // for, else the protocol most likely to need attention (has deviations,
@@ -182,7 +244,7 @@ export default function PatientDetail() {
 
   return (
     <>
-      <div className="lg:sticky lg:top-14 lg:z-10 lg:bg-gray-50 lg:pb-4">
+      <div ref={titleBlockRef} className="lg:sticky lg:top-14 lg:z-10 lg:bg-gray-50 lg:pb-4">
         <div className="mb-2">
           <Link to="/compliance/patients" className="text-sm text-blue-600 hover:text-blue-700">← Back to Patient List</Link>
         </div>
@@ -200,9 +262,48 @@ export default function PatientDetail() {
       {timeline.data && timeline.data.protocols.length > 0 && (
         <div className="flex flex-col gap-6 lg:flex-row">
           {/* Protocol list — pick one to see its full detail on the right */}
-          <Card title="Protocols" className="lg:w-80 lg:flex-shrink-0 lg:sticky lg:top-40 lg:self-start">
-            <div className="space-y-2 overflow-y-auto lg:max-h-[calc(100vh-16rem)]">
-              {orderedProtocols.map((proto) => {
+          <Card
+            title="Protocols"
+            className="lg:w-80 lg:flex-shrink-0 lg:self-start"
+            style={
+              isDesktop
+                ? { position: 'sticky', top: `${protocolsTopPx}px` }
+                : undefined
+            }
+          >
+            {orderedProtocols.length > 5 && (
+              <div className="relative mb-2">
+                <svg
+                  className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+                <input
+                  type="text"
+                  value={protocolSearch}
+                  onChange={(e) => setProtocolSearch(e.target.value)}
+                  placeholder="Search protocols…"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                />
+              </div>
+            )}
+            <div
+              className="space-y-2 overflow-y-auto"
+              // `position: sticky` can't move an element's bottom edge past its
+              // containing block's (this flex row's) bottom edge — so if the
+              // Protocols card is nearly as tall as the row (which the row's
+              // height takes from the Protocol Journey column), there's no
+              // room left to stick into and it behaves as if unstuck. Capping
+              // well under the viewport height keeps the card comfortably
+              // shorter than a typical journey column regardless of how many
+              // protocols this patient has.
+              style={isDesktop ? { maxHeight: `min(calc(100vh - ${protocolsTopPx}px - 4rem), 32rem)` } : undefined}
+            >
+              {visibleProtocols.length === 0 && (
+                <p className="py-4 text-center text-sm text-gray-400">No protocols match “{protocolSearch}”.</p>
+              )}
+              {visibleProtocols.map((proto) => {
                 const isSelected = proto.protocolInstanceId === selectedProtocolInstanceId;
                 const trackingMatch = tracking.data?.find((t) => t.protocolInstanceId === proto.protocolInstanceId);
                 const title = trackingMatch?.protocolTitle || proto.protocolCanonical;
@@ -332,6 +433,12 @@ export default function PatientDetail() {
                       <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
                       <span className="text-xs text-gray-600">Deviation</span>
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700">
+                        Mandatory
+                      </span>
+                      <span className="text-xs text-gray-600">Required step (must)</span>
+                    </div>
                   </div>
 
                   {deviations.isLoading && <div className="mb-3"><LoadingSpinner /></div>}
@@ -349,11 +456,17 @@ export default function PatientDetail() {
                         const isSubStep = depth > 0;
                         const isDeviation = displayStatus === 'DEVIATION';
                         const isNotStarted = displayStatus === 'NOT_STARTED';
+                        const isOutstandingMandatory = step.requiredBehavior === 'must' && !isDeviation
+                          && displayStatus !== 'COMPLETED' && displayStatus !== 'SKIPPED';
 
                         return (
                           <div
                             key={`${proto.protocolInstanceId}-j-${i}`}
-                            className={`flex gap-3 py-2.5 ${isDeviation ? 'rounded-lg bg-red-50 border border-red-200' : ''}`}
+                            className={`flex gap-3 py-2.5 ${
+                              isDeviation ? 'rounded-lg bg-red-50 border border-red-200'
+                                : isOutstandingMandatory ? 'rounded-lg bg-purple-50 border border-purple-100'
+                                : ''
+                            }`}
                             style={{ paddingLeft: `${depth * 24}px` }}
                           >
                             <div className="flex flex-col items-center">
@@ -370,6 +483,11 @@ export default function PatientDetail() {
                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${info.bg} ${info.text}`}>
                                   {info.label}
                                 </span>
+                                {step.requiredBehavior === 'must' && (
+                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700">
+                                    Mandatory
+                                  </span>
+                                )}
 
                                 {step.completionCount > 1 && (
                                   <span className="text-xs text-gray-400">×{step.completionCount}</span>

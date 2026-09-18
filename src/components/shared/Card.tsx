@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 interface CardProps {
   title?: string;
@@ -6,14 +6,15 @@ interface CardProps {
   description?: string;
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
   action?: ReactNode;
 }
 
-export function Card({ title, subtitle, description, children, className = '', action }: CardProps) {
+export function Card({ title, subtitle, description, children, className = '', style, action }: CardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm ${className}`}>
+    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm ${className}`} style={style}>
       {(title || action) && (
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
           <div>
