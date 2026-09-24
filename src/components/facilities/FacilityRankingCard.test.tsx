@@ -10,7 +10,7 @@ vi.mock('../../hooks/useFacilities', () => ({
   useFacilityRanking: () => ({
     data: { data: [{
       facilityId: '0035', rank: 1, facilityName: 'Kacyiru District Hospital',
-      complianceRate: 0, totalEnrollments: 1, activeDeviations: 3, totalEvents: 146,
+      complianceRate: 60, totalEnrollments: 5, nonCompliantPatients: 2, activeDeviations: 7, totalEvents: 146,
     }] },
     isPending: false, error: null,
   }),
@@ -55,6 +55,24 @@ describe('FacilityRankingCard — RI-33 adoption columns', () => {
     expect(screen.getByText('220')).toBeInTheDocument();            // expectedVisits (period)
     expect(screen.getByText('−219')).toBeInTheDocument();     // reportingGap, under-reporting → −219 (U+2212)
     expect(screen.getByText('0.45%')).toBeInTheDocument();          // adoptionRate
+  });
+});
+
+describe('FacilityRankingCard — Tracked Patients / Patients with Deviations columns', () => {
+  it('places Tracked Patients before Referrals, outside the Compliance group', () => {
+    renderCard();
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers.indexOf('Tracked Patients')).toBeGreaterThan(-1);
+    expect(headers.indexOf('Tracked Patients')).toBeLessThan(headers.indexOf('Referrals'));
+  });
+
+  it('shows distinct patients with deviations, not the raw deviation count', () => {
+    renderCard();
+    expect(screen.getByText('Patients with Deviations')).toBeInTheDocument();
+    expect(screen.queryByText('Deviations')).toBeNull();
+    expect(screen.getByText('5')).toBeInTheDocument();   // totalEnrollments (tracked)
+    expect(screen.getByText('2')).toBeInTheDocument();   // nonCompliantPatients
+    expect(screen.queryByText('7')).toBeNull();          // activeDeviations no longer rendered
   });
 });
 

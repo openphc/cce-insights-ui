@@ -127,7 +127,7 @@ export function FacilityRankingCard({ statusFilter = 'all' }: { statusFilter?: F
         </div>
       </div>
 
-      <Card title="Facility Ranking" description="Tracked patients — those with a protocol-matched clinical event in the selected period (by clinical event date, not enrollment) — counted once at their assigned facility. Compliance % reflects deviations that occurred in the period. Adoption columns show expected vs. actual visit volume for the period. Click a facility to open it on the Compliance page.">
+      <Card title="Facility Ranking" description="Tracked patients — those with a protocol-matched clinical event in the selected period (by clinical event date, not enrollment) — counted once at their assigned facility. Patients with Deviations is the distinct count of tracked patients with at least one deviation in the period; Compliance % = (Tracked Patients − Patients with Deviations) / Tracked Patients. Adoption columns show expected vs. actual visit volume for the period. Click a facility to open it on the Compliance page.">
         {statusLabel && (
           <p className="mb-3 text-xs text-gray-500">
             Filtered to <span className="font-semibold text-gray-700">{statusLabel}</span> facilities
@@ -139,22 +139,22 @@ export function FacilityRankingCard({ statusFilter = 'all' }: { statusFilter?: F
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  {/* Grouped header: Referrals | Compliance | e-Buzima Adoption | Status.
-                      Identity columns (Rank/Facility/Referrals/Status) span both rows and are
-                      bottom-aligned + styled like the sub-headers, so every column label lands on
+                  {/* Grouped header: Tracked Patients | Referrals | Compliance | e-Buzima Adoption | Status.
+                      Identity columns (Rank/Facility/Tracked Patients/Referrals/Status) span both rows and
+                      are bottom-aligned + styled like the sub-headers, so every column label lands on
                       one line while the group labels float above their sub-columns. */}
                   <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                     <th className="border-b border-gray-200 pt-3 pb-2 pr-4 align-bottom text-xs font-medium text-gray-500" rowSpan={2}>Rank</th>
                     <th className="border-b border-gray-200 pt-3 pb-2 pr-4 align-bottom text-xs font-medium text-gray-500" rowSpan={2}>Facility</th>
+                    <th className="border-b border-l border-gray-200 pt-3 pb-2 pl-4 pr-4 align-bottom text-xs font-medium text-gray-500" rowSpan={2}>Tracked Patients</th>
                     <th className="border-b border-l border-gray-200 pt-3 pb-2 pl-4 pr-4 align-bottom text-xs font-medium text-gray-500" rowSpan={2}>Referrals</th>
-                    <th className="border-b border-l border-gray-200 pt-3 pb-1.5 pl-4 pr-4 text-center" colSpan={3}>Compliance</th>
+                    <th className="border-b border-l border-gray-200 pt-3 pb-1.5 pl-4 pr-4 text-center" colSpan={2}>Compliance</th>
                     <th className="border-b border-l border-gray-200 pt-3 pb-1.5 pl-4 pr-4 text-center" colSpan={4}>e-Buzima Adoption (Selected Period)</th>
                     <th className="border-b border-l border-gray-200 pt-3 pb-2 pl-4 pr-4 align-bottom text-xs font-medium text-gray-500" rowSpan={2}>Events</th>
                     <th className="border-b border-l border-gray-200 pt-3 pb-2 pl-4 align-bottom text-xs font-medium text-gray-500" rowSpan={2}>Status</th>
                   </tr>
                   <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase text-gray-500">
-                    <th className="border-l border-gray-200 pt-2.5 pb-2 pl-4 pr-4">Tracked Patients</th>
-                    <th className="pt-2.5 pb-2 pr-4">Deviations</th>
+                    <th className="border-l border-gray-200 pt-2.5 pb-2 pl-4 pr-4" title="Distinct tracked patients with at least one deviation in the period">Patients with Deviations</th>
                     <th className="pt-2.5 pb-2 pr-4">Compliance</th>
                     <th className="border-l border-gray-200 pt-2.5 pb-2 pl-4 pr-4 text-center">Expected Visits (Period)</th>
                     <th className="pt-2.5 pb-2 pr-4 text-center">Actual Visits (Period)</th>
@@ -191,9 +191,9 @@ export function FacilityRankingCard({ statusFilter = 'all' }: { statusFilter?: F
                             {formatFacilityDisplayName(f, duplicateFacilityNames)}
                           </Link>
                         </td>
+                        <td className="border-l border-gray-200 py-2 pl-4 pr-4 tabular-nums">{formatNumber(f.totalEnrollments)}</td>
                         <td className="border-l border-gray-200 py-2 pl-4 pr-4 tabular-nums">{formatNumber(referralByFacility.get(f.facilityId) ?? 0)}</td>
-                        <td className="border-l border-gray-200 py-2 pl-4 pr-4">{formatNumber(f.totalEnrollments)}</td>
-                        <td className="py-2 pr-4">{formatNumber(f.activeDeviations)}</td>
+                        <td className="border-l border-gray-200 py-2 pl-4 pr-4 tabular-nums">{formatNumber(f.nonCompliantPatients)}</td>
                         <td className="py-2 pr-4">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                             f.complianceRate >= 80 ? 'bg-green-50 text-green-700' :
