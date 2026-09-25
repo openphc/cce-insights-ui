@@ -183,7 +183,7 @@
 │         │  ← Back to Compliance                                              │
 │         │                                                                    │
 │         │  ┌─ Step Analytics ──────────────────────────────────────────────┐ │
-│         │  │ Action       │ Completed │ Rate  │ On Time │ Late │ Avg Days │ │
+│         │  │ Action       │ Completed │ Rate  │ On Time │ Late │ vs Due   │ │
 │         │  │ anc-visit-1  │ 210/248   │ 85%   │ 145     │ 25   │ 1.2      │ │
 │         │  │ anc-visit-2  │ 160/248   │ 65%   │ 100     │ 45   │ 3.8      │ │
 │         │  │ anc-visit-3  │ 105/248   │ 42%   │  60     │ 30   │ 5.1      │ │
@@ -226,10 +226,10 @@
 |--------|--------|-------|
 | Action | `actionId` | Step name from PlanDefinition |
 | Completed | `completedCount / totalInstances` | Ratio |
-| Rate | `completionRate` | Percentage bar |
+| Rate | `completionRate` (0–1 fraction) | Percentage bar, `formatRate` (×100) |
 | On Time | `timelinessDistribution.completedOnTime` | Count (completed + SLA met) |
 | Late | `timelinessDistribution.completedLate` | Count (completed + SLA overdue/missed), highlighted amber |
-| Avg Days | `avgDaysToComplete` | Average days to complete |
+| Avg vs Due | `avgDaysToComplete` | Average of `completed_at − due_date` in days, shown as "N d early" / "N d late" (negative = before the due date) |
 | Median | `medianDaysToComplete` | Median days (tooltip) |
 
 ---

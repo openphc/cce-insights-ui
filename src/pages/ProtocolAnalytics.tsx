@@ -8,7 +8,7 @@ import { CompletionFunnelChart } from '../components/charts/CompletionFunnelChar
 import { OutcomeDistributionChart } from '../components/charts/OutcomeDistributionChart';
 import { EnrollmentTrendChart } from '../components/charts/EnrollmentTrendChart';
 import { useStepAnalytics, useCompletionFunnel, useOutcomeDistribution, useEnrollmentTrends } from '../hooks/useProtocols';
-import { formatNumber, formatPercentage } from '../utils/formatters';
+import { formatDaysVsDue, formatNumber, formatRate } from '../utils/formatters';
 import { INTERVAL_OPTIONS } from '../config';
 
 export default function ProtocolAnalytics() {
@@ -47,7 +47,7 @@ export default function ProtocolAnalytics() {
                   <th className="pb-2 pr-4">Rate</th>
                   <th className="pb-2 pr-4">On Time</th>
                   <th className="pb-2 pr-4">Late</th>
-                  <th className="pb-2">Avg Days</th>
+                  <th className="pb-2" title="Average of completion date minus due date, for completed steps that have a due date">Avg vs Due</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -58,14 +58,15 @@ export default function ProtocolAnalytics() {
                     <td className="py-2 pr-4">
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-200">
-                          <div className="h-full rounded-full bg-blue-500" style={{ width: `${s.completionRate}%` }} />
+                          {/* completionRate is a 0–1 fraction */}
+                          <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(s.completionRate * 100, 100)}%` }} />
                         </div>
-                        <span>{formatPercentage(s.completionRate)}</span>
+                        <span>{formatRate(s.completionRate)}</span>
                       </div>
                     </td>
                     <td className="py-2 pr-4">{formatNumber(s.timelinessDistribution.completedOnTime)}</td>
                     <td className="py-2 pr-4 text-amber-600">{formatNumber(s.timelinessDistribution.completedLate)}</td>
-                    <td className="py-2">{s.avgDaysToComplete?.toFixed(1) ?? '—'}</td>
+                    <td className="py-2 text-gray-600">{formatDaysVsDue(s.avgDaysToComplete)}</td>
                   </tr>
                 ))}
               </tbody>
