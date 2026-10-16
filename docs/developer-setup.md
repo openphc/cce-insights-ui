@@ -99,8 +99,20 @@ The dashboard should load metrics from the Insights Service. If you see "Cannot 
 
 ## 3. Environment Variables
 
-All config is **build-time** — Vite inlines `VITE_*` into the bundle. For the Docker image these
-are passed as `--build-arg` values (see §8), so the deployed bundle is baked per environment.
+Build once, configure per deployment. Values are baked in at build time and can be overridden
+at container start; the first non-empty value wins (`src/env.ts` → `getEnv`):
+
+1. **Runtime** — the container's environment (docker-compose `environment:` / k8s `env:`).
+   `docker/entrypoint.sh` writes them into `/srv/env-config.js` (`window._env_`, loaded by
+   `index.html` from `/insights/env-config.js`) at container start — a restart applies a change,
+   no rebuild. Unset variables are written empty, so the baked value still applies; never give one
+   a non-empty default in `entrypoint.sh`.
+2. **Build time** — Vite inlines `VITE_*` into the bundle: `.env` for `npm run build`, `--build-arg`
+   for the Docker image (see §8; CI sets them in
+   `BuildAndPushGHCR-demo-rw.yml`).
+3. Otherwise the default below.
+
+`VITE_ROUTER_BASE` (asset paths + router basename) and `VITE_AUTH_TOKEN` are build-time only.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -145,7 +157,7 @@ export default defineConfig({
     port: 3001,
     proxy: {
       '/v1/insights': {
-        target: 'http://localhost:8088',
+        target: 'http://localhost:8084',
         changeOrigin: true,
       },
     },
@@ -166,7 +178,10 @@ export default defineConfig({
 
 ```
 cce-insights-ui/
+├── docker/
+│   └── entrypoint.sh           # Writes /srv/env-config.js from VITE_* env at container start
 ├── public/
+│   └── env-config.js           # Empty runtime-config placeholder for npm run dev
 ├── src/
 │   ├── api/                    # Typed API client (12 endpoint modules + client.ts + types.ts)
 │   │   ├── client.ts           # buildUrl, authHeaders (Keycloak token), handleResponse, apiGet, apiGetPaginated
@@ -198,7 +213,8 @@ cce-insights-ui/
 │   ├── hooks/                  # 13 TanStack Query hooks
 │   ├── context/                # FilterContext (global date range + facility)
 │   ├── utils/                  # dates, colors, formatters, compliance, pagination, errors, facilityDisplay
-│   ├── config.ts               # UI constants and defaults (page sizes, filter options)
+│   ├── config.ts               # UI constants and defaults; APP_TIMEZONE (VITE_TIMEZONE)
+│   ├── env.ts                  # getEnv: runtime window._env_ → build-time VITE_* → fallback
 │   ├── App.tsx                 # Router + layout shell
 │   ├── main.tsx                # Entry point (React 18 + providers)
 │   ├── index.css               # Tailwind imports
@@ -325,25 +341,30 @@ ARG VITE_KEYCLOAK_URL=""
 ARG VITE_KEYCLOAK_REALM="cce"
 ARG VITE_KEYCLOAK_CLIENT_ID="cce-insights-ui"
 ARG VITE_ROUTER_BASE="/insights"
+ARG VITE_TIMEZONE="UTC"
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
     VITE_AUTH_ENABLED=$VITE_AUTH_ENABLED \
     VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL \
     VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM \
     VITE_KEYCLOAK_CLIENT_ID=$VITE_KEYCLOAK_CLIENT_ID \
-    VITE_ROUTER_BASE=$VITE_ROUTER_BASE
+    VITE_ROUTER_BASE=$VITE_ROUTER_BASE \
+    VITE_TIMEZONE=$VITE_TIMEZONE
 RUN npm run build
 
 # Production stage
 FROM caddy:2-alpine
-COPY --from=build /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
+# Writes /srv/env-config.js from the container's VITE_* env, then starts Caddy
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+COPY --from=build /app/dist /srv
 EXPOSE 3001
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+CMD ["/entrypoint.sh"]
 ```
 
-> **Auth is baked at build time.** Because Vite inlines `VITE_*` into the bundle, an
-> already-built image cannot be reconfigured via runtime `environment:` vars — you must rebuild
-> with the right `--build-arg` values to produce an auth-enabled image.
+> **Build args are defaults, not the only option.** The values baked by `--build-arg` apply when
+> the container sets nothing; any of them except `VITE_ROUTER_BASE` / `VITE_AUTH_TOKEN` can be
+> overridden at container start via `environment:` / k8s `env:`, without a rebuild.
 
 ### Caddyfile
 
@@ -359,6 +380,10 @@ CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
         root * /srv
         @assets path /assets/*
         header @assets Cache-Control "public, max-age=31536000, immutable"
+
+        # Runtime config is regenerated at every container start — never cache it.
+        @envconfig path /env-config.js
+        header @envconfig Cache-Control "no-cache"
         try_files {path} /index.html
         file_server
     }
@@ -406,9 +431,9 @@ networks:
 > **Note:** The UI container joins the existing `deploy-scripts_cce-net` Docker network where
 > `cce-insights-service` is already running. No gateway required for local development.
 >
-> The `environment:` block above is shown for parity with the committed `docker-compose.yml`, but
-> note that `VITE_*` are **build-time** values — they take effect only when the image is built with
-> matching `--build-arg`s (see the Dockerfile), not from runtime container env.
+> The `environment:` block above takes effect at container start (`docker/entrypoint.sh` →
+> `/srv/env-config.js`) and overrides the values baked in with `--build-arg`; leave a variable out
+> to keep the baked value.
 
 ### Build & Run
 

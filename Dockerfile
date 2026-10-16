@@ -40,9 +40,14 @@ FROM caddy:2-alpine
 # Copy Caddyfile
 COPY Caddyfile /etc/caddy/Caddyfile
 
+# Entrypoint: generates /srv/env-config.js from runtime container env vars before starting
+# Caddy, so a deployment can override the baked VITE_* values without a rebuild.
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Copy built assets from Stage 1
 COPY --from=build /app/dist /srv
 
 EXPOSE 3001
 
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+CMD ["/entrypoint.sh"]

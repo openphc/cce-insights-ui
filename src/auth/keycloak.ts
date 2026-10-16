@@ -1,4 +1,5 @@
 import Keycloak from 'keycloak-js';
+import { getEnv } from '../env';
 
 /**
  * Keycloak OIDC integration for the Insights UI.
@@ -8,27 +9,24 @@ import Keycloak from 'keycloak-js';
  * INSIGHTS_READ / COMPLIANCE_READ). This module performs the Authorization-Code + PKCE login
  * and exposes the live access token to the API client.
  *
- * Config is build-time (VITE_*). When VITE_AUTH_ENABLED !== 'true' the app runs unauthenticated
- * (local dev with the Vite proxy / direct insights-service).
+ * Config is read via getEnv (Docker runtime window._env_ → Vite env). When VITE_AUTH_ENABLED
+ * !== 'true' the app runs unauthenticated (local dev with the Vite proxy / direct insights-service).
  */
-export const authEnabled = import.meta.env.VITE_AUTH_ENABLED === 'true';
+export const authEnabled = getEnv('VITE_AUTH_ENABLED') === 'true';
 
 let keycloak: Keycloak | undefined;
 
 export async function initAuth(): Promise<void> {
   if (!authEnabled) return;
 
-  // The UI, Keycloak (/auth) and the gateway (/v1) are served on the SAME domain, so by
-  // default derive the Keycloak URL from the current origin (e.g. https://cce.moh.gov.rw/auth).
-  // This keeps the built image environment-agnostic — the same image works on UAT and PROD.
-  // VITE_KEYCLOAK_URL is only needed as an override (e.g. local dev against a remote Keycloak).
-  const keycloakUrl =
-    import.meta.env.VITE_KEYCLOAK_URL || `${window.location.origin}/auth`;
+  // When VITE_KEYCLOAK_URL is unset, assume Keycloak is served on the same domain as the UI
+  // (e.g. https://cce.example.org/auth).
+  const keycloakUrl = getEnv('VITE_KEYCLOAK_URL') || `${window.location.origin}/auth`;
 
   keycloak = new Keycloak({
     url: keycloakUrl,
-    realm: import.meta.env.VITE_KEYCLOAK_REALM || 'cce',
-    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'cce-insights-ui',
+    realm: getEnv('VITE_KEYCLOAK_REALM', 'cce'),
+    clientId: getEnv('VITE_KEYCLOAK_CLIENT_ID', 'cce-insights-ui'),
   });
 
   await keycloak.init({
@@ -55,5 +53,6 @@ export function getUsername(): string | undefined {
 }
 
 export function logout(): void {
-  keycloak?.logout({ redirectUri: window.location.origin + '/insights' });
+  // Back to the app root, under the router base when served behind an ingress (e.g. /insights).
+  keycloak?.logout({ redirectUri: window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') });
 }

@@ -17,6 +17,10 @@
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 
+		# Runtime config is regenerated at every container start — never cache it.
+		@envconfig path /env-config.js
+		header @envconfig Cache-Control "no-cache"
+
 		try_files {path} /index.html
 		file_server
 	}
@@ -27,6 +31,10 @@
 
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		# Runtime config is regenerated at every container start — never cache it.
+		@envconfig path /env-config.js
+		header @envconfig Cache-Control "no-cache"
 
 		try_files {path} /index.html
 		file_server

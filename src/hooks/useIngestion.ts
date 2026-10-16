@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getIngestionFunnel, getIngestionRejections, getSourceQuality, getPipelineLoss, getLastIngestedEvent } from '../api/ingestion';
 import { useGlobalFilters } from './useGlobalFilters';
+import { getEnv } from '../env';
 
-const LAST_EVENT_POLL_INTERVAL = Number(import.meta.env.VITE_POLLING_INTERVAL || 60000);
+const LAST_EVENT_POLL_INTERVAL = Number(getEnv('VITE_POLLING_INTERVAL') || 60000);
 
 export function useIngestionFunnel(params?: { source?: string; interval?: string }) {
   const filters = useGlobalFilters();

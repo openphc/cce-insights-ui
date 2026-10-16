@@ -14,6 +14,9 @@ env:
   # Branch-scoped incremental release tags: demo-rw-v1, demo-rw-v2, ... (one new tag per successful build)
   VERSION_TAG_PREFIX: demo-rw-v
   LATEST_TAG: demo-rw-latest
+  # Country display timezone (IANA name), baked into the image. Set per country branch:
+  # each country's branch carries its own value here (Rwanda = Africa/Kigali, UTC+2).
+  VITE_TIMEZONE: Africa/Kigali
 
 jobs:
   build:
@@ -71,7 +74,7 @@ jobs:
           --build-arg VITE_KEYCLOAK_REALM="${{ vars.VITE_KEYCLOAK_REALM || 'cce' }}" \
           --build-arg VITE_KEYCLOAK_CLIENT_ID="${{ vars.VITE_KEYCLOAK_CLIENT_ID || 'cce-insights-ui' }}" \
           --build-arg VITE_ROUTER_BASE="${{ vars.VITE_ROUTER_BASE || '/insights' }}" \
-          --build-arg VITE_TIMEZONE="${{ vars.VITE_TIMEZONE || 'UTC' }}" \
+          --build-arg VITE_TIMEZONE="${{ env.VITE_TIMEZONE }}" \
           -t ${IMAGE_URI}:${{ steps.version.outputs.version_tag }} .
 
     - name: Tag image as latest

@@ -1,3 +1,5 @@
+import { getEnv } from './env';
+
 export const DEFAULT_PAGE_SIZE = 50;
 
 export const TABLE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
@@ -56,4 +58,4 @@ export function resolveTimeZone(raw: string | undefined): string {
  * Display timezone. The insights-service stores and accepts UTC only: API timestamps are shown
  * in this zone, and the selected date range is converted from this zone to UTC before it is sent.
  */
-export const APP_TIMEZONE = resolveTimeZone(import.meta.env.VITE_TIMEZONE);
+export const APP_TIMEZONE = resolveTimeZone(getEnv('VITE_TIMEZONE'));

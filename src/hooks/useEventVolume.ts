@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getEventSummary, getEventTrends, getEventsByResourceType, getEventsByFacility, getEventKpis, getZeroMatchEvents } from '../api/events';
 import { useGlobalFilters } from './useGlobalFilters';
+import { getEnv } from '../env';
 
-const POLLING_INTERVAL = Number(import.meta.env.VITE_POLLING_INTERVAL || 60000);
+const POLLING_INTERVAL = Number(getEnv('VITE_POLLING_INTERVAL') || 60000);
 
 export function useEventSummary() {
   const filters = useGlobalFilters();

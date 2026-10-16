@@ -91,7 +91,7 @@ The same image works gateway-less (no auth) or behind the gateway — controlled
 | **Framework** | React | 18.x | Component-based UI |
 | **Language** | TypeScript | 5.x | Type safety |
 | **Build** | Vite | 6.x | Fast dev server, optimized builds |
-| **Auth** | Keycloak (`keycloak-js`) | 26.x | OIDC Authorization Code + PKCE login (optional, build-time flag) |
+| **Auth** | Keycloak (`keycloak-js`) | 26.x | OIDC Authorization Code + PKCE login (optional, `VITE_AUTH_ENABLED`) |
 | **Routing** | React Router | 7.x | Client-side page navigation |
 | **Server State** | TanStack Query | 5.x | API data fetching, caching, polling |
 | **Styling** | Tailwind CSS | 4.x | Utility-first CSS |
@@ -182,8 +182,8 @@ flowchart TD
 
 ### Authentication (`src/auth/keycloak.ts`)
 
-Authentication is optional and controlled by a **build-time** flag, `VITE_AUTH_ENABLED` (Vite
-inlines `VITE_*`; for the Docker image it is set via `--build-arg`). When the flag is `'true'`:
+Authentication is optional and controlled by `VITE_AUTH_ENABLED` (baked via `--build-arg`, can be
+overridden at container start — see below). When the flag is `'true'`:
 
 1. `initAuth()` runs in `main.tsx` **before** the app renders (`initAuth().then(render)`), so an
    unauthenticated user is redirected to Keycloak (`onLoad: 'login-required'`, `pkceMethod: 'S256'`).
@@ -201,8 +201,11 @@ unauthenticated against the Vite proxy or a direct insights-service. See
 [`artifacts/insights-ui-auth-deployment.md`](../artifacts/insights-ui-auth-deployment.md) for the
 full Keycloak + gateway deployment procedure.
 
-> **No runtime config.** There is no `window._env_` / entrypoint injection in this repo — all
-> config is build-time `import.meta.env.VITE_*`. `src/config.ts` holds only UI constants.
+> **Config resolution.** `src/env.ts` (`getEnv`) reads runtime `window._env_` first — written to
+> `/srv/env-config.js` by `docker/entrypoint.sh` at container start from the container's `VITE_*`
+> env — then the build-time `import.meta.env.VITE_*`, then the default. Empty values count as unset,
+> so a deployment that sets nothing (as the k8s manifests do today) runs on the baked values.
+> `VITE_ROUTER_BASE` stays build-time. `src/config.ts` holds UI constants and `APP_TIMEZONE`.
 
 ---
 
@@ -586,7 +589,7 @@ npm run dev    # Vite dev server at http://localhost:3001
 
 ### Docker
 
-The build stage accepts `VITE_*` **build args** (auth + router base are baked into the bundle):
+The build stage accepts `VITE_*` **build args** (baked into the bundle as defaults; all but the router base can be overridden at container start):
 
 ```dockerfile
 FROM node:20-alpine AS build
@@ -600,20 +603,25 @@ ARG VITE_KEYCLOAK_URL=""
 ARG VITE_KEYCLOAK_REALM="cce"
 ARG VITE_KEYCLOAK_CLIENT_ID="cce-insights-ui"
 ARG VITE_ROUTER_BASE="/insights"
+ARG VITE_TIMEZONE="UTC"
 ENV VITE_AUTH_ENABLED=$VITE_AUTH_ENABLED \
     VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL \
     VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM \
     VITE_KEYCLOAK_CLIENT_ID=$VITE_KEYCLOAK_CLIENT_ID \
-    VITE_ROUTER_BASE=$VITE_ROUTER_BASE
+    VITE_ROUTER_BASE=$VITE_ROUTER_BASE \
+    VITE_TIMEZONE=$VITE_TIMEZONE
 RUN npm run build
 
 FROM caddy:2-alpine
-COPY --from=build /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
+COPY docker/entrypoint.sh /entrypoint.sh   # writes /srv/env-config.js at container start
+RUN chmod +x /entrypoint.sh
+COPY --from=build /app/dist /srv
 EXPOSE 3001
+CMD ["/entrypoint.sh"]
 ```
 
-> The dev Vite proxy targets `http://localhost:8088`; the container Caddyfile proxies to
+> The dev Vite proxy targets `http://localhost:8084`; the container Caddyfile proxies to
 > `cce-insights-service:8084`. In authenticated deployments API calls instead route through the
 > gateway (JWT-validated) — see [deployment-guide.md](./deployment-guide.md).
 
@@ -631,6 +639,10 @@ EXPOSE 3001
         root * /srv
         @assets path /assets/*
         header @assets Cache-Control "public, max-age=31536000, immutable"
+
+        # Runtime config is regenerated at every container start — never cache it.
+        @envconfig path /env-config.js
+        header @envconfig Cache-Control "no-cache"
         try_files {path} /index.html
         file_server
     }

@@ -5,6 +5,7 @@ import {
 } from '../api/facilities';
 import { useGlobalFilters } from './useGlobalFilters';
 import type { RankBy, SortOrder } from '../api/types';
+import { getEnv } from '../env';
 
 export function useFacilityActivitySummary() {
   const filters = useGlobalFilters();
@@ -16,7 +17,7 @@ export function useFacilityActivitySummary() {
       facilityId: filters.facilityId,
       district: filters.district,
     }),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }
 
@@ -29,7 +30,7 @@ export function useFacilityActivityDetail() {
       endDate: filters.endDate,
       district: filters.district,
     }),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }
 

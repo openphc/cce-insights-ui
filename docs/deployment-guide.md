@@ -80,15 +80,26 @@ npm install
 npm run dev          # http://localhost:3001
 ```
 
-In dev mode, Vite's dev server proxies `/v1/insights/*` to `localhost:8088` (configured in `vite.config.ts`).
+In dev mode, Vite's dev server proxies `/v1/insights/*` to `localhost:8084` (configured in `vite.config.ts`).
 
 ## Configuration
 
-### Environment Variables (build-time)
+### Environment Variables
 
-All config is **build-time**: Vite inlines `VITE_*` into the bundle. For the Docker image they
-are passed as `--build-arg` values (see the `Dockerfile` ARG/ENV block), so the deployed bundle is
-baked per environment. Set them in `.env` for `npm run build`, or as build args for `docker build`.
+Build once, configure per deployment. Values are baked in at build time and can be overridden
+at container start; the first non-empty value wins (`src/env.ts` → `getEnv`):
+
+1. **Runtime** — the container's environment (docker-compose `environment:` / k8s `env:`).
+   `docker/entrypoint.sh` writes them into `/srv/env-config.js` (`window._env_`, loaded by
+   `index.html` from `/insights/env-config.js`) at container start — a restart applies a change,
+   no rebuild. Unset variables are written empty, so the baked value still applies; never give one
+   a non-empty default in `entrypoint.sh`.
+2. **Build time** — Vite inlines `VITE_*` into the bundle: `.env` for `npm run build`, `--build-arg`
+   for the Docker image (see the `Dockerfile` ARG/ENV block; CI sets them in
+   `BuildAndPushGHCR-demo-rw.yml`).
+3. Otherwise the default below.
+
+`VITE_ROUTER_BASE` (asset paths + router basename) and `VITE_AUTH_TOKEN` are build-time only.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -101,7 +112,7 @@ baked per environment. Set them in `.env` for `npm run build`, or as build args 
 | `VITE_ROUTER_BASE` | `/` (dev) | SPA router base path. The Docker image bakes `/insights` (served under that path by the ingress) |
 | `VITE_POLLING_INTERVAL` | `60000` | Dashboard auto-refresh interval (ms) |
 | `VITE_DEFAULT_DATE_RANGE_DAYS` | `90` | Default date range filter |
-| `VITE_TIMEZONE` | `UTC` | IANA display timezone (e.g. `Africa/Kigali`). API timestamps are shown in this zone, and the selected date range is converted from it to UTC before being sent (the insights-service is UTC only). Invalid names fall back to UTC |
+| `VITE_TIMEZONE` | `UTC` | IANA display timezone (e.g. `Africa/Kigali`). API timestamps are shown in this zone, and the selected date range is converted from it to UTC before being sent (the insights-service is UTC only). Invalid names fall back to UTC. In CI it is set per country branch in the workflow's `env:` block (`BuildAndPushGHCR-demo-rw.yml`), not as a repository variable |
 
 ### Caddy Configuration
 
@@ -111,6 +122,7 @@ The `Caddyfile` uses `handle` blocks for proper directive ordering:
 - `handle` (default) — serves the React SPA from `/srv` with `try_files` fallback to `index.html`
 - Gzip/zstd compression via `encode`
 - Aggressive caching for `/assets/*` (Vite hashed filenames)
+- `Cache-Control: no-cache` for `/env-config.js` (regenerated at every container start)
 - Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
 
 ### Docker Network

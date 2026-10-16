@@ -4,6 +4,7 @@ import {
   getDeviationResolutionRate, getIntelligenceSummary, getDeviationKpis,
 } from '../api/deviations';
 import { useGlobalFilters } from './useGlobalFilters';
+import { getEnv } from '../env';
 
 // RI-56: facilityId now comes exclusively from the global header filter (useGlobalFilters).
 export function useDeviationKpis(protocolDefinitionId?: string) {
@@ -17,7 +18,7 @@ export function useDeviationKpis(protocolDefinitionId?: string) {
       startDate: filters.startDate,
       endDate: filters.endDate,
     }),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }
 
@@ -69,6 +70,6 @@ export function useIntelligenceSummary() {
   return useQuery({
     queryKey: ['deviations', 'intelligence-summary', filters],
     queryFn: () => getIntelligenceSummary(filters),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }

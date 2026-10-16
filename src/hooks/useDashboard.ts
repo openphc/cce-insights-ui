@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getDashboardOverview, getDashboardComplianceSummary, getReferralsKpi } from '../api/dashboard';
 import { useGlobalFilters } from './useGlobalFilters';
+import { getEnv } from '../env';
 
-const POLLING_INTERVAL = Number(import.meta.env.VITE_POLLING_INTERVAL || 60000);
+const POLLING_INTERVAL = Number(getEnv('VITE_POLLING_INTERVAL') || 60000);
 
 export function useDashboardOverview() {
   const filters = useGlobalFilters();

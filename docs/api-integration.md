@@ -28,7 +28,7 @@
 import type { ErrorResponse, PaginatedResponse } from './types';
 import { authEnabled, getToken } from '../auth/keycloak';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const BASE_URL = getEnv('VITE_API_BASE_URL');
 
 export class ApiError extends Error {
   constructor(
@@ -55,7 +55,7 @@ function authHeaders(): Record<string, string> {
   if (authEnabled) {
     // Live Keycloak access token (kept fresh by initAuth's refresh loop);
     // VITE_AUTH_TOKEN is a static fallback for local testing without a login.
-    const token = getToken() || import.meta.env.VITE_AUTH_TOKEN;
+    const token = getToken() || getEnv('VITE_AUTH_TOKEN');
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
@@ -112,7 +112,7 @@ export { buildUrl };
 
 ### Authentication (`src/auth/keycloak.ts`)
 
-Auth is gated by the build-time flag `authEnabled` (`VITE_AUTH_ENABLED === 'true'`). When enabled:
+Auth is gated by `authEnabled` (`getEnv('VITE_AUTH_ENABLED') === 'true'` — baked at build time, overridable at container start). When enabled:
 
 - `initAuth()` runs in `main.tsx` before render (`onLoad: 'login-required'`, `pkceMethod: 'S256'`),
   redirecting unauthenticated users to Keycloak (Authorization Code + PKCE).
@@ -123,7 +123,8 @@ Auth is gated by the build-time flag `authEnabled` (`VITE_AUTH_ENABLED === 'true
   validates issuer, audience (`gateway-service`), and the `INSIGHTS_READ` role.
 
 When disabled, the auth path is inert (local dev / gateway-less demo). There is **no** `sessionStorage`
-token and **no** `window._env_` runtime config — all config is build-time `import.meta.env.VITE_*`.
+token. Config is read with `getEnv` (`src/env.ts`): runtime `window._env_` (written by
+`docker/entrypoint.sh`) → build-time `import.meta.env.VITE_*` → default.
 
 ```typescript
 // src/auth/keycloak.ts — exports
@@ -1425,7 +1426,7 @@ export function useDeviationKpis(protocolDefinitionId?: string) {
   return useQuery({
     queryKey: ['deviations', 'kpis', { protocolDefinitionId, ...filters }],
     queryFn: () => getDeviationKpis({ protocolDefinitionId, ...filters }),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }
 
@@ -1451,7 +1452,7 @@ export function useIntelligenceSummary() {
   return useQuery({
     queryKey: ['deviations', 'intelligence-summary', filters],
     queryFn: () => getIntelligenceSummary(filters),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }
 ```
@@ -1467,7 +1468,7 @@ import {
 } from '../api/events';
 import { useGlobalFilters } from './useGlobalFilters';
 
-const POLLING_INTERVAL = Number(import.meta.env.VITE_POLLING_INTERVAL || 60000);
+const POLLING_INTERVAL = Number(getEnv('VITE_POLLING_INTERVAL') || 60000);
 
 export function useEventSummary() {
   const filters = useGlobalFilters();
@@ -1667,7 +1668,7 @@ export default defineConfig({
     port: 3001,
     proxy: {
       '/v1/insights': {
-        target: 'http://localhost:8088',
+        target: 'http://localhost:8084',
         changeOrigin: true,
       },
     },

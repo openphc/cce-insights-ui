@@ -1,7 +1,8 @@
 import type { ErrorResponse, PaginatedResponse } from './types';
 import { authEnabled, getToken } from '../auth/keycloak';
+import { getEnv } from '../env';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const BASE_URL = getEnv('VITE_API_BASE_URL');
 
 export class ApiError extends Error {
   constructor(
@@ -28,7 +29,7 @@ function authHeaders(): Record<string, string> {
   if (authEnabled) {
     // Live Keycloak access token (kept fresh by initAuth's refresh loop). VITE_AUTH_TOKEN is a
     // static fallback for local testing without a login.
-    const token = getToken() || import.meta.env.VITE_AUTH_TOKEN;
+    const token = getToken() || getEnv('VITE_AUTH_TOKEN');
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
