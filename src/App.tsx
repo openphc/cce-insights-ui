@@ -4,8 +4,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { CcnSidebar } from './components/layout/CcnSidebar';
 import { LoadingSpinner } from './components/shared/LoadingSpinner';
 import { DateRangeFilter } from './components/shared/DateRangeFilter';
-import { useAuth } from './auth/AuthContext';
-import { getEnv } from './env';
+import { authEnabled, logout } from './auth/keycloak';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ComplianceOverview = lazy(() => import('./pages/ComplianceOverview'));
@@ -27,8 +26,6 @@ const CcnDisputes = lazy(() => import('./pages/CcnDisputes'));
 
 function ProtectedLayout() {
   const location = useLocation();
-  const { logout } = useAuth();
-  const authEnabled = getEnv('VITE_AUTH_ENABLED') === 'true';
   const isCcn = location.pathname.startsWith('/ccn');
 
   return (
@@ -39,7 +36,8 @@ function ProtectedLayout() {
           <DateRangeFilter />
           {authEnabled && (
             <button
-              onClick={logout}
+              type="button"
+              onClick={() => logout()}
               className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
             >
               Sign out

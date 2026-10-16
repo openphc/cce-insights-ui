@@ -3,6 +3,7 @@ node_modules
 
 # Build output
 dist
+*.tsbuildinfo
 
 # Environment
 .env
@@ -27,3 +28,6 @@ coverage
 
 # Docker
 docker-compose.override.yml
+
+# Claude Code local settings
+.claude/*

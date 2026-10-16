@@ -24,8 +24,10 @@
 ```typescript
 // src/api/client.ts
 import type { ErrorResponse, PaginatedResponse } from './types';
+import { authEnabled, getToken } from '../auth/keycloak';
+import { getEnv } from '../env';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const BASE_URL = getEnv('VITE_API_BASE_URL');
 
 export class ApiError extends Error {
   constructor(
@@ -49,10 +51,10 @@ function buildUrl(path: string, params?: Record<string, string | undefined>): st
 
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (import.meta.env.VITE_AUTH_ENABLED === 'true') {
-    const token =
-      import.meta.env.VITE_AUTH_TOKEN ||
-      sessionStorage.getItem('access_token');
+  if (authEnabled) {
+    // Live Keycloak access token (kept fresh by initAuth's refresh loop). VITE_AUTH_TOKEN is a
+    // static fallback for local testing without a login.
+    const token = getToken() || getEnv('VITE_AUTH_TOKEN');
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
@@ -1231,7 +1233,7 @@ export function useIntelligenceSummary() {
   return useQuery({
     queryKey: ['intelligence', 'summary'],
     queryFn: getIntelligenceSummary,
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }
 ```
@@ -1244,7 +1246,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getEventSummary, getEventTrends, getEventsByResourceType } from '../api/events';
 import { useGlobalFilters } from './useGlobalFilters';
 
-const POLLING_INTERVAL = Number(import.meta.env.VITE_POLLING_INTERVAL || 60000);
+const POLLING_INTERVAL = Number(getEnv('VITE_POLLING_INTERVAL') || 60000);
 
 export function useEventSummary() {
   const filters = useGlobalFilters();
@@ -1328,6 +1330,13 @@ export function useGlobalFilters(): GlobalFilters {
 
 > **Note:** The hook converts YYYY-MM-DD date strings from the FilterContext to ISO 8601 OffsetDateTime
 > format (`2026-03-01T00:00:00Z` / `2026-03-31T23:59:59Z`) required by the Insights Service.
+>
+> **Timezone (`VITE_TIMEZONE`, default `UTC`).** The Insights Service is UTC-only. The selected days
+> are interpreted in the configured IANA zone and converted to UTC (`toStartOfDayISO` /
+> `toEndOfDayISO`), so with `Africa/Kigali` (UTC+2) a `2026-06-22` filter is sent as
+> `2026-06-21T22:00:00Z` – `2026-06-22T21:59:59Z`. API timestamps are rendered in that same zone at
+> display time (`formatDate` / `formatDateTime`); response payloads are not rewritten. Trend
+> `period` buckets are UTC `yyyy-MM-dd` days chosen by the service, so they are shown as returned.
 
 ---
 

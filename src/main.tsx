@@ -3,10 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FilterProvider } from './context/FilterContext';
-import { AuthProvider } from './auth/AuthContext';
-import keycloak from './auth/keycloak';
-import { getEnv } from './env';
 import { App } from './App';
+import { initAuth } from './auth/keycloak';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -19,30 +17,26 @@ const queryClient = new QueryClient({
   },
 });
 
-async function bootstrap() {
-  if (getEnv('VITE_AUTH_ENABLED') === 'true') {
-    // login-required: redirects to Keycloak if not authenticated.
-    // App only renders once the user is authenticated.
-    await keycloak.init({
-      onLoad: 'login-required',
-      pkceMethod: 'S256',
-      checkLoginIframe: false,
-    });
-  }
-
+function render() {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <BrowserRouter>
-        <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <FilterProvider>
-              <App />
-            </FilterProvider>
-          </QueryClientProvider>
-        </AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <FilterProvider>
+            <App />
+          </FilterProvider>
+        </QueryClientProvider>
       </BrowserRouter>
     </StrictMode>,
   );
 }
 
-bootstrap();
+// Complete the Keycloak login (when enabled) before rendering so the first API calls carry a
+// valid token. With onLoad:'login-required', unauthenticated users are redirected to Keycloak
+// and only return here once authenticated.
+initAuth()
+  .then(render)
+  .catch((err) => {
+    console.error('Auth initialisation failed', err);
+    render();
+  });

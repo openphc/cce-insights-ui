@@ -2,10 +2,13 @@ import { useState, useContext } from 'react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { Card } from '../components/shared/Card';
 import { FilterContext } from '../context/FilterContext';
+import { useGlobalFilters } from '../hooks/useGlobalFilters';
 import { getExportUrl } from '../api/exports';
 
 export default function Exports() {
   const { startDate, endDate } = useContext(FilterContext);
+  // The export endpoint takes OffsetDateTime, so send the UTC day boundaries, not the raw dates.
+  const filters = useGlobalFilters();
   const [format, setFormat] = useState<'json' | 'csv'>('json');
   const [protocolId, setProtocolId] = useState('');
   const [facilityId, setFacilityId] = useState('');
@@ -15,8 +18,8 @@ export default function Exports() {
       format,
       protocolDefinitionId: protocolId || undefined,
       facilityId: facilityId || undefined,
-      startDate,
-      endDate,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
     });
     window.open(url, '_blank', 'noopener,noreferrer');
   };

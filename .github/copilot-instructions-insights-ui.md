@@ -49,7 +49,7 @@ This is the **Analytics UI** referenced in the CCE Solution Design §7.2.5. It r
 - **All dates displayed in local timezone** with UTC tooltip on hover
 - **Polling for live data** — TanStack Query `refetchInterval` on dashboard views (configurable, default 60s)
 - **Responsive layout** — desktop-first, usable on tablet
-- **Global date range filter** — persistent across pages via React context; defaults to last 30 days
+- **Global date range filter** — persistent across pages via React context; defaults to last 90 days
 - **Global facility filter** — optional facility selector in header; when set, scoped to all API calls
 - **Cursor-based pagination** — follows CCE `{ data: [...], pagination: { limit, next_cursor, has_more } }` envelope
 - **Response envelope handling** — all API responses wrapped in `{ "data": ... }`; API client unwraps automatically
@@ -300,7 +300,7 @@ npm run preview      # Preview production build
 | `VITE_API_BASE_URL` | `http://localhost:8084` | Insights Service base URL (or Gateway URL) |
 | `VITE_AUTH_ENABLED` | `false` | Enable OAuth (demo mode = false) |
 | `VITE_POLLING_INTERVAL` | `60000` | Auto-refresh interval in ms (0 to disable) |
-| `VITE_DEFAULT_DATE_RANGE_DAYS` | `30` | Default date range for dashboard (days back from today) |
+| `VITE_DEFAULT_DATE_RANGE_DAYS` | `90` | Default date range for dashboard (days back from today) |
 
 ## Testing
 

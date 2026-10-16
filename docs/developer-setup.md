@@ -9,7 +9,7 @@
 
 | Tool | Version | Required | Purpose |
 |---|---|---|---|
-| **Node.js** | 20 LTS+ | Yes | JavaScript runtime |
+| **Node.js** | 24 LTS+ | Yes | JavaScript runtime |
 | **npm** | 10+ | Yes | Package manager (bundled with Node) |
 | **Git** | 2.x | Yes | Version control |
 | **Docker** | 24+ | Recommended | Run backend dependencies |
@@ -68,7 +68,7 @@ Default `.env`:
 VITE_API_BASE_URL=http://localhost:8084
 VITE_AUTH_ENABLED=false
 VITE_POLLING_INTERVAL=60000
-VITE_DEFAULT_DATE_RANGE_DAYS=180
+VITE_DEFAULT_DATE_RANGE_DAYS=90
 ```
 
 ### 2.4 Start Development Server
@@ -94,10 +94,14 @@ The dashboard should load metrics from the Insights Service. If you see "Cannot 
 | Variable | Default | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | `http://localhost:8084` | Insights Service URL. Set to empty string `""` when using Vite proxy. |
-| `VITE_AUTH_ENABLED` | `false` | Enable OAuth token injection. `false` for demo mode. |
-| `VITE_AUTH_TOKEN` | _(empty)_ | Static bearer token override. Falls back to `sessionStorage('access_token')`. |
+| `VITE_AUTH_ENABLED` | `false` | Keycloak login and Bearer token on API calls. `false` for demo mode. |
+| `VITE_KEYCLOAK_URL` | _(empty)_ | Keycloak base URL (e.g. `https://keycloak.cce.mdtlabs.org/auth`). Empty = same origin + `/auth` |
+| `VITE_KEYCLOAK_REALM` | `cce` | Keycloak realm |
+| `VITE_KEYCLOAK_CLIENT_ID` | `cce-insights-ui` | Public OIDC client (PKCE S256) |
+| `VITE_AUTH_TOKEN` | _(empty)_ | Static Bearer token fallback for local testing without a login. |
 | `VITE_POLLING_INTERVAL` | `60000` | Auto-refresh interval in milliseconds. `0` to disable. |
-| `VITE_DEFAULT_DATE_RANGE_DAYS` | `180` | Default date range for dashboard (days back from today). |
+| `VITE_DEFAULT_DATE_RANGE_DAYS` | `90` | Default date range for dashboard (days back from today). |
+| `VITE_TIMEZONE` | `UTC` | IANA display timezone (e.g. `Africa/Kigali`). API timestamps are shown in this zone, and the selected date range is converted from it to UTC before being sent (the insights-service is UTC only). Read at runtime in Docker. Invalid names fall back to UTC |
 
 ---
 
@@ -151,7 +155,10 @@ export default defineConfig({
 
 ```
 cce-insights-ui/
+├── docker/
+│   └── entrypoint.sh           # Writes /srv/env-config.js from VITE_* env at container start
 ├── public/
+│   └── env-config.js           # Empty runtime-config placeholder for npm run dev
 ├── src/
 │   ├── api/                    # Typed API client (11 modules)
 │   │   ├── client.ts           # buildUrl, authHeaders (Keycloak token), handleResponse, apiGet, apiGetPaginated
@@ -166,7 +173,7 @@ cce-insights-ui/
 │   │   ├── patients.ts         # Patient timeline, tracking, events, deviations, risk
 │   │   └── protocols.ts        # Step analytics, funnel, outcomes, enrollment
 │   ├── auth/
-│   │   └── keycloak.ts         # Keycloak OIDC init (PKCE), auto-refresh token
+│   │   └── keycloak.ts         # initAuth (OIDC, PKCE), getToken, logout; background token refresh
 │   ├── components/
 │   │   ├── layout/             # Sidebar
 │   │   ├── shared/             # Card, MetricCard, StatusBadge, PageHeader, ErrorAlert,
@@ -176,7 +183,9 @@ cce-insights-ui/
 │   ├── pages/                  # 11 page components (lazy-loaded)
 │   ├── hooks/                  # 10 TanStack Query hooks
 │   ├── context/                # FilterContext (global date range + facility)
-│   ├── utils/                  # dates, colors, formatters, compliance, pagination, errors, errors
+│   ├── utils/                  # dates (timezone-aware), colors, formatters, compliance, pagination, errors
+│   ├── config.ts               # Constants + APP_TIMEZONE (VITE_TIMEZONE)
+│   ├── env.ts                  # getEnv: runtime window._env_ → build-time VITE_* → fallback
 │   ├── config.ts               # Constants and defaults
 │   ├── App.tsx                 # Router + layout shell
 │   ├── main.tsx                # Entry point (React 18 + providers)
@@ -292,7 +301,7 @@ src/
 
 ```dockerfile
 # Build stage
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

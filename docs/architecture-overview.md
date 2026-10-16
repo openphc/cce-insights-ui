@@ -168,7 +168,7 @@ flowchart TD
 | **Charts** | Recharts wrappers; receive processed data arrays | No data fetching; pure render |
 | **Hooks** | TanStack Query wrappers; return `{ data, isLoading, error }` | One hook per API endpoint group; receive global filters from context |
 | **API** | Typed `fetch` wrappers; URL construction, error parsing, envelope unwrapping (14 modules incl. lookups) | No React dependencies; pure TypeScript |
-| **Auth** | Token injection via `VITE_AUTH_TOKEN` or `sessionStorage('access_token')` | Enabled when `VITE_AUTH_ENABLED=true`; no Keycloak dependency in demo mode |
+| **Auth** | `auth/keycloak.ts`: Keycloak OIDC login (PKCE) before render, background token refresh; `client.ts` adds the Bearer token | Enabled when `VITE_AUTH_ENABLED=true`; no Keycloak call in demo mode |
 | **Context** | Global filter state (date range, facility) shared across pages | Persisted in URL search params for shareability |
 | **Utils** | Pure functions for formatting, computation, color mapping | No side effects |
 
@@ -515,7 +515,7 @@ npm run dev    # Vite dev server at http://localhost:3001
 ### Docker
 
 ```dockerfile
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

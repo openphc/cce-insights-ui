@@ -4,6 +4,7 @@ import {
   getDeviationResolutionRate, getIntelligenceSummary,
 } from '../api/deviations';
 import { useGlobalFilters } from './useGlobalFilters';
+import { getEnv } from '../env';
 
 export function useDeviationTrends(interval = 'weekly') {
   const filters = useGlobalFilters();
@@ -34,6 +35,6 @@ export function useIntelligenceSummary() {
   return useQuery({
     queryKey: ['deviations', 'intelligence-summary', filters],
     queryFn: () => getIntelligenceSummary(filters),
-    refetchInterval: Number(import.meta.env.VITE_POLLING_INTERVAL || 60000),
+    refetchInterval: Number(getEnv('VITE_POLLING_INTERVAL') || 60000),
   });
 }

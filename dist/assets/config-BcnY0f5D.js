@@ -1,1 +1,0 @@
-const e=[{value:"daily",label:"Daily"},{value:"weekly",label:"Weekly"},{value:"monthly",label:"Monthly"}],l=[{value:"complianceRate",label:"Compliance Rate"},{value:"deviationCount",label:"Deviation Count"},{value:"eventVolume",label:"Event Volume"}],a=[{value:"desc",label:"Best First"},{value:"asc",label:"Worst First"}];export{e as I,l as R,a as S};

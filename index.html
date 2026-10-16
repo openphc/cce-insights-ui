@@ -5,8 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CCE Insights</title>
-    <!-- Runtime environment config — overwritten by docker/entrypoint.sh at container start -->
-    <script src="/env-config.js"></script>
+    <!-- Runtime environment config — written by docker/entrypoint.sh at container start.
+         %BASE_URL% keeps it under the router base (e.g. /insights/) behind an ingress. -->
+    <script src="%BASE_URL%env-config.js"></script>
   </head>
   <body>
     <div id="root"></div>

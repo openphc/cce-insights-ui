@@ -30,7 +30,7 @@ docker compose up -d --build
 ```
 
 This will:
-- Build a multi-stage Docker image (node:20-alpine → caddy:2-alpine)
+- Build a multi-stage Docker image (node:24-alpine → caddy:2-alpine)
 - Join the `deploy-scripts_cce-net` network where `cce-insights-service` is running
 - Expose the UI on http://localhost:3001
 
@@ -72,26 +72,41 @@ In dev mode, Vite's dev server proxies `/v1/insights/*` to `localhost:8084` (con
 
 ## Configuration
 
-### Environment Variables (build-time)
+### Environment Variables
 
-Set in `.env` before `npm run build` or `docker compose build`:
+Build once, configure per deployment. Every variable can be set in two places, and the first
+non-empty value wins (`src/env.ts` → `getEnv`):
+
+1. **Runtime** — the container's environment (docker-compose `environment:` / k8s `env:`).
+   `docker/entrypoint.sh` writes them into `/srv/env-config.js` (`window._env_`) at container
+   start, so changing one needs a restart, not a rebuild. Unset variables are written empty.
+2. **Build time** — `.env` for `npm run build`, baked in by Vite.
+3. Otherwise the default below.
+
+Never give a variable a non-empty default in `entrypoint.sh`: it would silently override the baked
+value.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_API_BASE_URL` | _(empty)_ | API base URL. Empty = relative (Caddy proxy). Set to `http://localhost:8084` for local dev |
-| `VITE_AUTH_ENABLED` | `false` | Enable OAuth bearer token |
-| `VITE_AUTH_TOKEN` | _(empty)_ | Static bearer token override. Falls back to `sessionStorage` |
+| `VITE_AUTH_ENABLED` | `false` | Keycloak login (OIDC, PKCE) and Bearer token on API calls |
+| `VITE_KEYCLOAK_URL` | _(empty)_ | Keycloak base URL (e.g. `https://keycloak.cce.mdtlabs.org/auth`). Empty = same origin + `/auth` |
+| `VITE_KEYCLOAK_REALM` | `cce` | Keycloak realm |
+| `VITE_KEYCLOAK_CLIENT_ID` | `cce-insights-ui` | Public OIDC client (PKCE S256) |
+| `VITE_AUTH_TOKEN` | _(empty)_ | Build time only: static Bearer token fallback for local testing without a login |
 | `VITE_POLLING_INTERVAL` | `60000` | Dashboard auto-refresh interval (ms) |
-| `VITE_DEFAULT_DATE_RANGE_DAYS` | `180` | Default date range filter |
+| `VITE_DEFAULT_DATE_RANGE_DAYS` | `90` | Default date range filter |
+| `VITE_TIMEZONE` | `UTC` | IANA display timezone (e.g. `Africa/Kigali`). API timestamps are shown in this zone, and the selected date range is converted from it to UTC before being sent (the insights-service is UTC only). Invalid names fall back to UTC |
 
 ### Caddy Configuration
 
 The `Caddyfile` uses `handle` blocks for proper directive ordering:
 - Listens on port 3001
-- `handle /v1/insights/*` — reverse proxies API calls to `cce-insights-service:8084`
+- `handle /v1/insights/*` — reverse proxies API calls to `gateway-service:8090` (JWT validation)
 - `handle` (default) — serves the React SPA from `/srv` with `try_files` fallback to `index.html`
 - Gzip/zstd compression via `encode`
 - Aggressive caching for `/assets/*` (Vite hashed filenames)
+- `Cache-Control: no-cache` for `/env-config.js` (regenerated at every container start)
 - Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
 
 ### Docker Network

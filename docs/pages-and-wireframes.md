@@ -2,7 +2,7 @@
 
 > **CCE Insights UI** — Page-by-page design reference with ASCII wireframes  
 > Each page maps to one or more Insights Service API endpoints. Compliance categories are binary: **Compliant** (`on_track`) and **Non-Compliant** (`non_compliant`).
-> Default date range: **180 days**.
+> Default date range: **90 days** (`VITE_DEFAULT_DATE_RANGE_DAYS`).
 
 ---
 

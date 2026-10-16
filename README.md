@@ -1,6 +1,6 @@
 # CCE Insights UI
 
-**Analytics dashboard** for the Clinical Care Engine (CCE) platform. Consumes REST endpoints from the CCE Insights Service to provide compliance analytics, deviation trends, event volume metrics, facility rankings, practitioner analytics, intelligence delivery monitoring, and ingestion pipeline monitoring. Compliance categories are binary: **Compliant** (`on_track`) and **Non-Compliant** (`non_compliant`). Default date range: **180 days**.
+**Analytics dashboard** for the Clinical Care Engine (CCE) platform. Consumes REST endpoints from the CCE Insights Service to provide compliance analytics, deviation trends, event volume metrics, facility rankings, practitioner analytics, intelligence delivery monitoring, and ingestion pipeline monitoring. Compliance categories are binary: **Compliant** (`on_track`) and **Non-Compliant** (`non_compliant`). Default date range: **90 days** (`VITE_DEFAULT_DATE_RANGE_DAYS`).
 
 ## Architecture
 
@@ -24,7 +24,7 @@ Browser → :3001 → CCE Gateway (OAuth, :8060) → Insights Service (:8084) �
 | Charts | Recharts 2 |
 | Icons | Heroicons 2 |
 | Dates | date-fns 4 |
-| Auth | Bearer token (VITE_AUTH_TOKEN or sessionStorage) |
+| Auth | Keycloak OIDC (keycloak-js, PKCE) → Bearer token |
 | Testing | Vitest + Testing Library + MSW |
 
 ## Quick Start
@@ -84,10 +84,16 @@ npm run dev          # http://localhost:3001
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_API_BASE_URL` | _(empty — relative)_ | Insights Service base URL. Empty = relative URLs (Caddy proxy). Set `http://localhost:8084` for local dev without Docker. |
-| `VITE_AUTH_ENABLED` | `false` | Enable OAuth (demo mode = false) |
-| `VITE_AUTH_TOKEN` | _(empty)_ | Static bearer token override. Falls back to sessionStorage |
+| `VITE_AUTH_ENABLED` | `false` | Keycloak login + Bearer token (demo mode = false) |
+| `VITE_KEYCLOAK_URL` | _(empty)_ | Empty = same origin + `/auth` |
+| `VITE_KEYCLOAK_REALM` | `cce` | Keycloak realm |
+| `VITE_KEYCLOAK_CLIENT_ID` | `cce-insights-ui` | Public OIDC client (PKCE S256) |
+| `VITE_AUTH_TOKEN` | _(empty)_ | Static Bearer token fallback for local testing |
 | `VITE_POLLING_INTERVAL` | `60000` | Auto-refresh interval (ms) |
-| `VITE_DEFAULT_DATE_RANGE_DAYS` | `180` | Default dashboard date range |
+| `VITE_DEFAULT_DATE_RANGE_DAYS` | `90` | Default dashboard date range |
+| `VITE_TIMEZONE` | `UTC` | IANA display timezone (e.g. `Africa/Kigali`) |
+
+In Docker every variable except `VITE_AUTH_TOKEN` can be overridden at container start, without a rebuild — see the [Deployment Guide](docs/deployment-guide.md#environment-variables).
 
 ## Build & Deploy
 
