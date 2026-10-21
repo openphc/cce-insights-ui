@@ -14,14 +14,14 @@ import {
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: ChartBarIcon },
   { to: '/compliance', label: 'Compliance', icon: ClipboardDocumentCheckIcon },
+  { to: '/facilities', label: 'Facilities', icon: BuildingOffice2Icon },
   { to: '/practitioners', label: 'Practitioners', icon: UserGroupIcon },
   { to: '/deviations', label: 'Deviations', icon: ExclamationTriangleIcon },
-  { to: '/intelligence', label: 'Intelligence', icon: BoltIcon },
   { to: '/compliance/patients', label: 'Patients', icon: ClipboardDocumentCheckIcon },
+  { to: '/intelligence', label: 'Intelligence', icon: BoltIcon },
   { to: '/events', label: 'Events', icon: SignalIcon },
   { to: '/ingestion', label: 'Ingestion', icon: CogIcon },
   { to: '/exports', label: 'Exports', icon: ArrowDownTrayIcon },
-  { to: '/facilities', label: 'Facilities', icon: BuildingOffice2Icon },
 ];
 
 export function Sidebar() {
@@ -31,7 +31,7 @@ export function Sidebar() {
         <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center">
           <span className="text-xs font-bold text-white">C</span>
         </div>
-        <span className="text-sm font-bold text-gray-900">CHW App Care Coordination Insights</span>
+        <span className="text-sm font-bold text-gray-900">Care Coordination Insights</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
