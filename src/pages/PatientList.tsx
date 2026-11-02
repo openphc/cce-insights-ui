@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { CursorPagination } from '../components/shared/CursorPagination';
 import { useProtocolPatients } from '../hooks/useComplianceSummary';
 import { useProtocols } from '../hooks/useLookups';
+import { useGlobalFilters } from '../hooks/useGlobalFilters';
 import { formatPercentage } from '../utils/formatters';
 import { COMPLIANCE_COLORS } from '../utils/colors';
 import type { ComplianceCategory } from '../api/types';
@@ -31,6 +32,14 @@ export default function PatientList() {
       setProtocolId(protocols.data[0].id);
     }
   }, [protocols.data, protocolId]);
+
+  // A new date range is a new result set: restart paging from the first page.
+  const { startDate, endDate } = useGlobalFilters();
+  useEffect(() => {
+    setCursor(undefined);
+    setCursorHistory([]);
+    setPage(1);
+  }, [startDate, endDate]);
 
   const patients = useProtocolPatients(protocolId, {
     status: statusFilter || undefined,

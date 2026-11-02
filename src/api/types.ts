@@ -248,7 +248,8 @@ export interface DeviationRecord {
   stepInstanceId: string;
   actionId: string;
   deviationType: DeviationType;
-  detectedAt: string;
+  occurredAt: string;   // clinical occurrence date (when the deviation happened)
+  detectedAt: string;   // system detection date (when we flagged it)
   facilityId: string;
 }
 

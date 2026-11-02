@@ -39,6 +39,8 @@ export function getProtocolPatients(
     limit?: number;
     cursor?: string;
     patientId?: string;
+    startDate?: string;
+    endDate?: string;
   },
 ) {
   return apiGetPaginated<PatientCompliance>(
@@ -49,6 +51,8 @@ export function getProtocolPatients(
       limit: (params?.limit ?? 20).toString(),
       cursor: params?.cursor,
       patientId: params?.patientId,
+      startDate: params?.startDate,
+      endDate: params?.endDate,
     },
   );
 }

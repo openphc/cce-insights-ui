@@ -210,6 +210,7 @@ export default function Deviations() {
                     <th className="pb-2 pr-4">Action</th>
                     <th className="pb-2 pr-4">Type</th>
                     <th className="pb-2 pr-4">Facility</th>
+                    <th className="pb-2 pr-4">Occurred</th>
                     <th className="pb-2">Detected</th>
                   </tr>
                 </thead>
@@ -231,6 +232,7 @@ export default function Deviations() {
                         </span>
                       </td>
                       <td className="py-2 pr-4 text-gray-600">{getFacilityName(d.facilityId)}</td>
+                      <td className="py-2 pr-4 text-gray-600">{formatDate(d.occurredAt)}</td>
                       <td className="py-2 text-gray-600">{formatDate(d.detectedAt)}</td>
                     </tr>
                   ))}

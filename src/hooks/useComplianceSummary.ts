@@ -26,9 +26,12 @@ export function useProtocolPatients(
   protocolDefinitionId: string,
   params?: { status?: string; facilityId?: string; limit?: number; cursor?: string; patientId?: string },
 ) {
+  // Enrolment cohort of the global date range, matching the protocol compliance summary.
+  const { startDate, endDate } = useGlobalFilters();
+  const effectiveParams = { ...params, startDate, endDate };
   return useQuery({
-    queryKey: ['compliance', 'patients', protocolDefinitionId, params],
-    queryFn: () => getProtocolPatients(protocolDefinitionId, params),
+    queryKey: ['compliance', 'patients', protocolDefinitionId, effectiveParams],
+    queryFn: () => getProtocolPatients(protocolDefinitionId, effectiveParams),
     enabled: !!protocolDefinitionId,
   });
 }
