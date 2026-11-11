@@ -30,6 +30,16 @@ together, such as one visit.
   and completed instances.
 - The protocol's `x/y steps` count leaves groups out.
 - **Compliance → Service Workflow Compliance:** a group shows as a container labelled "step group".
+  Before, a group was left out and its steps were lifted to the nearest step above them, or to the
+  top level.
+  - A group inside a group, such as a consultation inside a visit, is nested inside it.
+  - A group's header shows how often it opened, for how many patients, and how many of those were
+    completed (needs cce-insights-service's step-analytics `groups[]`).
+  - A step inside a group is measured per time it was expected, with its patients alongside, such as
+    `30/150 times · 21/105 patients`. A step outside every group is measured per patient, as before.
+    Every count shows its unit.
+  - A group's children are "Steps", a step's "Sub-actions"; their count leaves groups out.
+  - A protocol without groups, such as Kenya SHA, shows as before, apart from the units.
 
 ### CCE 2.0.0 step status model
 

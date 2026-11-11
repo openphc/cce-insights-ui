@@ -159,8 +159,45 @@
 | Click patient row | Navigate to `/compliance/patients/{patientId}` |
 | Switch compliance filter tabs | Re-query patient list with `status` parameter |
 
-> A **step group**, such as a visit, has no data of its own in the Service Workflow Compliance tree.
-> Its steps show under the nearest ancestor with data, or at the top level.
+**Step groups in the Service Workflow Compliance tree** (`buildWorkflowTree`). A step group, such as
+a visit, has no step data of its own. It shows as a container (`group: true` in the action order)
+whenever a step inside it, at any depth, has data:
+- A group inside a group, such as a consultation inside a visit, is nested inside it. It is not shown
+  as a second card beside it, and its steps are not lifted to the top level.
+- Its children are listed as **Steps (n)**. A step's children are **Sub-actions (n)**. `n` counts
+  every step below, at any depth; a group inside it is not counted.
+- Its header shows its own figures from step analytics `groups[]`: how often it opened, for how many
+  patients, and how many of those had every step so far done. For example: `step group · 150 opened
+  for 105 patients · 40% completed (60/150)`. Against an API without `groups[]`, it shows only
+  "step group".
+- A step inside a group, at any depth, can repeat once per visit. So it is measured per time it was
+  expected (`completedStepInstanceCount / stepInstanceCount`), with its patients alongside:
+  `30/150 times · 21/105 patients`. A step outside every group is measured per patient, against the
+  patients who completed the step before it, as before: `50 of 105 patients completed`. Every count
+  shows its unit.
+- A step with no data is still left out. A step below it hangs on its nearest shown ancestor: a step
+  with data, or a group. A protocol without groups, such as Kenya SHA, shows as before.
+
+Example, the Rwanda outpatient protocol:
+
+```
+● Registration                                    48%
+    50 of 105 patients completed · 55 missing
+● Outpatient Visit   step group · 150 opened for 105 patients · 40% completed (60/150)
+    STEPS (10)
+    ● Patient Visit                  100%  140/140 times · 97/97 patients
+    ● Vitals Recording                20%  30/150 times · 21/105 patients
+    ○ Clinical Consultation  step group · 120 opened for 83 patients · 75% completed (90/120)
+        STEPS (8)
+        ● Clinical Consultation      83%  100/120 times · 73/83 patients
+        ● Chief Complaints          100%  60/60 times · 43/43 patients
+        ● History of Present Illness 100% 12/12 times · 9/9 patients
+        ● Laboratory Order          100%  40/40 times · 31/31 patients
+            ● Laboratory Results     56%  14/25 times · 12/20 patients
+        ● Clinical Diagnosis         32%  38/118 times · 27/82 patients
+        ● Treatment Prescription    100%  30/30 times · 23/23 patients
+        ● Referral                  100%  18/18 times · 15/15 patients
+```
 
 ---
 

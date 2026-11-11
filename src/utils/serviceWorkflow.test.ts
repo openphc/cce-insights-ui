@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWorkflowTree, countDescendants, type WorkflowNode, type WorkflowStepInput } from './serviceWorkflow';
+import { buildWorkflowTree, countDescendants, isInAGroup, type WorkflowNode, type WorkflowStepInput } from './serviceWorkflow';
 
 // Kenya SHA NSHR Outpatient Visit Protocol action order (as served by /action-order on dev)
 const kenyaOrder = [
@@ -20,7 +20,7 @@ const s = (actionId: string, totalInstances = 1): WorkflowStepInput => ({ action
 
 // Render a tree as "id(child,child(grandchild))" for compact assertions.
 const shape = (nodes: WorkflowNode<WorkflowStepInput>[]): string =>
-  nodes.map((n) => n.step.actionId + (n.children.length ? `(${shape(n.children)})` : '')).join(',');
+  nodes.map((n) => n.actionId + (n.group ? '[group]' : '') + (n.children.length ? `(${shape(n.children)})` : '')).join(',');
 
 describe('buildWorkflowTree', () => {
   it('nests a deep protocol chain to every level, in action order', () => {
@@ -53,5 +53,53 @@ describe('buildWorkflowTree', () => {
   it('does not loop on a cyclic action order', () => {
     const order = [{ actionId: 'a', parentActionId: 'b' }, { actionId: 'b', parentActionId: 'c' }, { actionId: 'c', parentActionId: 'b' }];
     expect(shape(buildWorkflowTree([s('a')], order))).toBe('a');
+  });
+});
+
+// The Rwanda outpatient protocol: a visit group, with a consultation group inside it, and lab results
+// under lab order, a step.
+const rwandaOrder = [
+  { actionId: 'outpatient-visit', parentActionId: null, group: true },
+  { actionId: 'visit-encounter', parentActionId: 'outpatient-visit' },
+  { actionId: 'vitals-recording', parentActionId: 'outpatient-visit' },
+  { actionId: 'clinical-consultation', parentActionId: 'outpatient-visit', group: true },
+  { actionId: 'consultation', parentActionId: 'clinical-consultation' },
+  { actionId: 'lab-order', parentActionId: 'clinical-consultation' },
+  { actionId: 'lab-results', parentActionId: 'lab-order' },
+  { actionId: 'diagnosis', parentActionId: 'clinical-consultation' },
+  { actionId: 'registration', parentActionId: null },
+];
+
+describe('buildWorkflowTree with step groups', () => {
+  it('nests a group inside the group around it, not beside it, and a step under a step', () => {
+    const steps = ['diagnosis', 'lab-results', 'registration', 'visit-encounter', 'consultation', 'lab-order',
+      'vitals-recording'].map((id) => s(id));
+    const tree = buildWorkflowTree(steps, rwandaOrder);
+    expect(shape(tree)).toBe(
+      'outpatient-visit[group](visit-encounter,vitals-recording,' +
+        'clinical-consultation[group](consultation,lab-order(lab-results),diagnosis)),registration',
+    );
+    expect(tree[0].step).toBeNull();
+    expect(countDescendants(tree[0])).toBe(6); // its steps at every depth; the consultation group is not one
+    expect(countDescendants(tree[0].children[2])).toBe(4);
+  });
+
+  it('shows a group whenever a step inside it has data, and hangs a step on its group when its parent step has none', () => {
+    const tree = buildWorkflowTree([s('lab-results', 3)], rwandaOrder);
+    expect(shape(tree)).toBe('outpatient-visit[group](clinical-consultation[group](lab-results))');
+  });
+
+  it('leaves out a group with no step data inside it', () => {
+    const tree = buildWorkflowTree([s('registration'), s('vitals-recording', 0)], rwandaOrder);
+    expect(shape(tree)).toBe('registration');
+  });
+
+  it('knows which actions sit inside a step group, at any depth', () => {
+    expect(isInAGroup('vitals-recording', rwandaOrder)).toBe(true);
+    expect(isInAGroup('lab-results', rwandaOrder)).toBe(true);
+    expect(isInAGroup('clinical-consultation', rwandaOrder)).toBe(true);
+    expect(isInAGroup('outpatient-visit', rwandaOrder)).toBe(false);
+    expect(isInAGroup('registration', rwandaOrder)).toBe(false);
+    expect(isInAGroup('visit-encounter', kenyaOrder)).toBe(false);
   });
 });
