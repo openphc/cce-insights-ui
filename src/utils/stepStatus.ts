@@ -8,15 +8,6 @@ export function stepsOnly(journey: JourneyStep[]): JourneyStep[] {
   return journey.filter((s) => !s.group);
 }
 
-/**
- * How a group instance is named under its group: "#2" for the second one to open. Numbered by
- * position, not cycleIndex: a nested group starts again at cycle 0 inside each instance of its
- * parent, so two of its instances can share a cycleIndex. A group that opened once gets no number.
- */
-export function groupInstanceLabel(position: number, instanceCount: number): string | null {
-  return instanceCount > 1 ? `#${position + 1}` : null;
-}
-
 /** An action with no step instance yet — reported NOT_STARTED, with no stepStatus. A group that never opened is the same. */
 export function isUntriggered(step: JourneyStep): boolean {
   return step.status === 'NOT_STARTED' && !step.stepStatus;

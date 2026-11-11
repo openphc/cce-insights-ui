@@ -435,6 +435,10 @@ Arriving from the Patient List or the Deviations page (both link with
 auto-selects it, so a deep link lands on the enrollment the user actually came to look at rather
 than an arbitrary default.
 
+The **Deviations** and **Intelligence Alerts** lists show **5 at a time**. With more than 5, a pager
+under the list shows the range, such as `1–5 of 12`, with ‹ and › to move between pages. Picking
+another protocol starts both lists again at page 1.
+
 ### APIs Used
 
 | Endpoint | Purpose |
@@ -485,18 +489,32 @@ Root steps that are untriggered — `status` `NOT_STARTED` with no `stepStatus`,
 A step group is a set of steps that belong together, such as one visit. The protocol defines it. Its
 row in the journey has a **Step group** badge, and its steps follow it, one level deeper.
 
-Under the group's name, each of its instances is listed, in the order they opened. A group that
-repeats, such as one visit per day, has one instance per cycle. Each instance shows:
-- a number (`#1`, `#2`, …), when the group opened more than once;
-- its status: **Completed**, **In progress** (still open), **Overdue** or **Missed** (the group's own
-  deadline);
-- how many of its steps are done, such as `1/2 steps`. Steps in a group nested inside it count too;
-- the day it opened.
+Under the group's name, each of its instances is a chip. A group that repeats, such as one visit
+per day, has one instance per cycle.
+- The chips run **newest first**.
+- A chip shows a number (`#1`, `#2`, …) and the day it opened, such as `#14 · Nov 1`. The number is
+  left out when the group opened once. The year is added when the visits span more than one year.
+- A dot on each chip says how the visit went:
+  - **green**: completed;
+  - **purple**: in progress (still open);
+  - **red**: has a deviation. A deviation's step is in that visit, at any depth, or the group missed its
+    own deadline. Red wins over green and purple.
+- The **latest 4** visits get a chip each. The rest sit behind an **"N earlier visits"** button. It opens
+  a menu of them, newest first, each with its status and steps done. The menu never holds just one
+  visit: with 5 visits, all 5 get chips.
+- Hovering a chip shows it in full: `#6 · Oct 1, 2026 · In progress · 2/4 steps · has a deviation`.
+- A line under the chips says the same for the shown visit: `Shown: #6 · Oct 1, 2026 · In progress ·
+  2/4 steps`. Steps done count steps in a group nested inside it too. The status is **Completed**,
+  **In progress**, **Overdue** or **Missed** (the group's own deadline).
+- When a protocol has more than one visit, the legend adds the three dot colours under **Visit chips**.
 
 **One cycle at a time.** The steps under a group show one of its instances, not all of them merged:
 - By default, the latest instance is shown.
-- When a group has more than one instance, each instance is a button. Click one to show its steps.
-  The shown instance has a blue ring.
+- When a group has more than one instance, each chip is a button. Click one to show its steps. The
+  shown chip has a blue ring.
+- Picking a visit from the **earlier visits** menu shows it and closes the menu. That visit then gets a
+  chip of its own, after the latest 4, so the shown visit always has a chip. Escape or a click outside
+  closes the menu.
 - The group's badge, and each step's badge, time, SLA badge, practitioner and facility, come from the
   shown instance.
 - A step with nothing in the shown instance reads **Not started**.
@@ -510,8 +528,8 @@ repeats, such as one visit per day, has one instance per cycle. Each instance sh
 - A link can open the page at a visit: `?visit=groupActionId:groupInstanceId,…`. The Deviations page
   uses it.
 
-An instance is named by its number and the day it opened, such as `#2 · Nov 3, 2026`. A group that
-opened once shows only the day.
+Outside the chips, an instance is named by its number and the full day it opened, such as
+`#2 · Nov 3, 2026`. A group that opened once shows only the day.
 
 An open group reads **In progress** rather than Pending. A group that never opened is
 **Not started**, and follows the visibility rules above like an untriggered step. The protocol's
@@ -529,12 +547,21 @@ BP. Visit #2 is shown, as the latest:
 
 ```
 ● Visit                       [In progress] [Step group]
-  [#1 · Nov 2, 2026 · Completed · 2/2 steps] ((#2 · Nov 3, 2026 · In progress · 1/2 steps))
+  ((🟣 #2 · Nov 3))  [🟢 #1 · Nov 2]
+  Shown: #2 · Nov 3, 2026 · In progress · 1/2 steps
   ● History                   [Completed]
   ● Blood Pressure            [Pending]
 ```
 
 Clicking `#1` shows the first visit: Visit and both steps read **Completed**.
+
+A patient with 14 visits, the latest shown. Visit #12 had a deviation:
+
+```
+● Outpatient Visit            [In progress] [Step group]
+  ((🟣 #14 · Nov 1))  [🟢 #13 · Oct 28]  [🔴 #12 · Oct 21]  [🟣 #11 · Oct 17]  [🕘 10 earlier visits ⌄]
+  Shown: #14 · Nov 1, 2026 · In progress · 2/4 steps
+```
 
 ### Timeliness badges
 

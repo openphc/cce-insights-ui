@@ -65,6 +65,25 @@ export function formatDate(dateStr: string, timeZone: string = APP_TIMEZONE): st
   });
 }
 
+/** Like {@link formatDate}, without the year: "Nov 1". */
+export function formatMonthDay(dateStr: string, timeZone: string = APP_TIMEZONE): string {
+  const isDateOnly = DATE_ONLY.test(dateStr);
+  return parseApiInstant(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: isDateOnly ? 'UTC' : timeZone,
+  });
+}
+
+/** The year of an API timestamp in `timeZone`, such as "2026". */
+export function formatYear(dateStr: string, timeZone: string = APP_TIMEZONE): string {
+  const isDateOnly = DATE_ONLY.test(dateStr);
+  return parseApiInstant(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    timeZone: isDateOnly ? 'UTC' : timeZone,
+  });
+}
+
 /** Render an API timestamp as date + 24h time in `timeZone`. */
 export function formatDateTime(dateStr: string, timeZone: string = APP_TIMEZONE): string {
   return parseApiInstant(dateStr).toLocaleString('en-US', {

@@ -1,5 +1,5 @@
 import type { GroupInstance, GroupPathEntry, JourneyStep, JourneyStepInstance, StepDisplayStatus } from '../api/types';
-import { formatDate } from './dates';
+import { formatDate, formatMonthDay, formatYear } from './dates';
 
 // A step group that repeats, such as one visit per day, has one instance per cycle. The journey's
 // rows merge every cycle. These helpers show one cycle of each group at a time: the one the user
@@ -157,6 +157,82 @@ function notStarted(row: JourneyStep): JourneyStep {
  */
 export function groupInstanceName(number: number | null | undefined, openedAt: string): string {
   return number ? `#${number} · ${formatDate(openedAt)}` : formatDate(openedAt);
+}
+
+// ── A group's instances as chips ──
+
+/** A group instance with the number it is shown with: null when its group opened only once. */
+export interface NumberedGroupInstance {
+  instance: GroupInstance;
+  number: number | null;
+}
+
+/** How many of a group's latest instances get a chip of their own. The rest go in a menu. */
+export const RECENT_CHIPS = 4;
+
+/**
+ * How a group's instances are laid out as chips, newest first:
+ * - the latest {@link RECENT_CHIPS} each get a chip;
+ * - the rest go in an "earlier visits" menu, newest first too;
+ * - the shown instance always has a chip, even when it is an earlier one;
+ * - the menu never holds just one instance: that one gets a chip instead.
+ *
+ * `instances` are in the order they opened. Each is numbered by that order, such as `#2` for the
+ * second to open, not by cycleIndex: a nested group starts again at cycle 0 inside each instance of
+ * its parent, so two of its instances can share a cycleIndex. A group that opened once gets no number.
+ */
+export function chipLayout(
+  instances: GroupInstance[],
+  shownInstanceId: string | null,
+  recentCount: number = RECENT_CHIPS,
+): { chips: NumberedGroupInstance[]; earlier: NumberedGroupInstance[] } {
+  const newestFirst = instances
+    .map((instance, position) => ({ instance, number: instances.length > 1 ? position + 1 : null }))
+    .reverse();
+  if (newestFirst.length <= recentCount + 1) return { chips: newestFirst, earlier: [] };
+
+  const chips = newestFirst.slice(0, recentCount);
+  const earlier = newestFirst.slice(recentCount);
+  const shownEarlier = earlier.find((n) => n.instance.groupInstanceId === shownInstanceId);
+  if (!shownEarlier) return { chips, earlier };
+  return { chips: [...chips, shownEarlier], earlier: earlier.filter((n) => n !== shownEarlier) };
+}
+
+/** What a chip's dot shows: a deviation first, else whether the instance is done. */
+export type ChipTone = 'COMPLETED' | 'IN_PROGRESS' | 'DEVIATION';
+
+/**
+ * A group instance's chip tone. It has a deviation when a deviation's step instance is in it, at
+ * any depth, or when the group missed its own deadline.
+ */
+export function chipTone(instance: GroupInstance, groupInstancesWithDeviations: Set<string>): ChipTone {
+  if (groupInstancesWithDeviations.has(instance.groupInstanceId)
+    || instance.status === 'OVERDUE' || instance.status === 'MISSED') {
+    return 'DEVIATION';
+  }
+  return instance.status === 'COMPLETED' ? 'COMPLETED' : 'IN_PROGRESS';
+}
+
+/**
+ * The group instances that hold a deviation, from each deviation's `groupPath`. A deviation in a
+ * consultation inside a visit marks both.
+ */
+export function groupInstancesWithDeviations(deviations: { groupPath?: GroupPathEntry[] | null }[]): Set<string> {
+  return new Set(deviations.flatMap((d) => (d.groupPath ?? []).map((entry) => entry.groupInstanceId)));
+}
+
+/**
+ * A chip's short name: its number and the day it opened, such as "#14 · Nov 1". The year is added
+ * when `withYear` is set, for a group whose instances span more than one year.
+ */
+export function groupInstanceChipName(number: number | null, openedAt: string, withYear: boolean): string {
+  const day = withYear ? formatDate(openedAt) : formatMonthDay(openedAt);
+  return number ? `#${number} · ${day}` : day;
+}
+
+/** Whether a group's instances opened in more than one year, so chips need the year. */
+export function spansYears(instances: GroupInstance[]): boolean {
+  return new Set(instances.map((instance) => formatYear(instance.openedAt))).size > 1;
 }
 
 /**

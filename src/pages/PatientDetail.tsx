@@ -5,16 +5,20 @@ import { Card } from '../components/shared/Card';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { ErrorAlert } from '../components/shared/ErrorAlert';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { PagedList } from '../components/shared/PagedList';
 import { usePatientTimeline, usePatientProtocolTracking, usePatientProtocolTrackingDetail, usePatientDeviations, usePatientIntelligenceDeliveries } from '../hooks/usePatients';
 import { useActionOrder } from '../hooks/useProtocols';
 import { formatDate, formatDateTime } from '../utils/dates';
 import { formatPercentage } from '../utils/formatters';
 import { STATUS_COLORS, STATE_COLORS } from '../utils/colors';
 import type { ProtocolInstanceStatus, JourneyStep, GroupInstance, StepDisplayStatus } from '../api/types';
-import { groupInstanceLabel, isUntriggered, stepDisplayStatus, stepsOnly, visibleJourneySteps } from '../utils/stepStatus';
+import { isUntriggered, stepDisplayStatus, stepsOnly, visibleJourneySteps } from '../utils/stepStatus';
 import {
-  groupInstanceName, groupPathLabel, selectionFor, selectionFromParam, showCycles, type CycleSelection,
+  chipLayout, chipTone, groupInstanceChipName, groupInstanceName, groupInstancesWithDeviations, groupPathLabel,
+  selectionFor, selectionFromParam, showCycles, spansYears,
+  type ChipTone, type CycleSelection, type NumberedGroupInstance,
 } from '../utils/groupCycles';
+import { ChevronDownIcon, ClockIcon } from '@heroicons/react/20/solid';
 
 // PENDING is a UI-only state: the step exists but its event has not arrived and no deadline has
 // been breached. The API reports it as NOT_STARTED, the same as an action with no step yet, and only
@@ -48,48 +52,126 @@ const GROUP_INSTANCE_STATUS: Record<StepDisplayStatus, { label: string; style: J
   MISSED:      { label: 'Missed',      style: 'MISSED' },
 };
 
+/** How many deviations, and how many intelligence alerts, the side lists show a page. */
+const SIDE_LIST_PAGE_SIZE = 5;
+
+/** A visit chip's dot, by what it says about the visit. */
+const CHIP_TONE: Record<ChipTone, { dot: string; label: string }> = {
+  COMPLETED:   { dot: 'bg-green-500',  label: 'Completed' },
+  IN_PROGRESS: { dot: 'bg-purple-500', label: 'In progress' },
+  DEVIATION:   { dot: 'bg-red-500',    label: 'Has deviation' },
+};
+
 /**
- * A step group's instances, such as its visits, each with how many of its steps are done. With more
- * than one, each is a button: picking one shows that instance's steps below.
+ * A step group's instances, such as its visits, as chips: the latest few, newest first, and the rest
+ * behind an "earlier visits" menu. Each chip has a dot: completed, in progress, or has a deviation.
+ * With more than one instance, each chip is a button: picking one shows that instance's steps below.
+ * The line under the chips says which instance is shown, and how far along it is.
  */
-function GroupInstanceList({ instances, shownInstanceId, onShow }: {
+function GroupInstanceList({ instances, shownInstanceId, deviatedInstanceIds, onShow }: {
   instances: GroupInstance[];
   shownInstanceId: string | null;
+  deviatedInstanceIds: Set<string>;
   onShow: (groupInstanceId: string) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the menu on a click outside it, or on Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
+
   const selectable = instances.length > 1;
+  const withYear = spansYears(instances);
+  const { chips, earlier } = chipLayout(instances, shownInstanceId);
+  const shown = [...chips, ...earlier].find((n) => n.instance.groupInstanceId === shownInstanceId);
+
+  /** In full, such as "#6 · Oct 1, 2026 · In progress · 2/4 steps · has a deviation". */
+  const describe = ({ instance, number }: NumberedGroupInstance) => {
+    const status = GROUP_INSTANCE_STATUS[instance.status] ?? GROUP_INSTANCE_STATUS.NOT_STARTED;
+    const deviation = chipTone(instance, deviatedInstanceIds) === 'DEVIATION' ? ' · has a deviation' : '';
+    return `${groupInstanceName(number, instance.openedAt)} · ${status.label} · `
+      + `${instance.completedSteps}/${instance.totalSteps} steps${deviation}`;
+  };
+  const dot = (instance: GroupInstance) => (
+    <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${CHIP_TONE[chipTone(instance, deviatedInstanceIds)].dot}`} />
+  );
+  const chipStyle = 'inline-flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1 text-xs font-medium text-gray-800';
+
   return (
-    <div className="mt-1 flex flex-wrap gap-2">
-      {instances.map((instance, position) => {
-        const status = GROUP_INSTANCE_STATUS[instance.status] ?? GROUP_INSTANCE_STATUS.NOT_STARTED;
-        const colors = JOURNEY_STATUS[status.style];
-        // Named by number and the day it opened, such as "#2 · Sep 6, 2026".
-        const number = groupInstanceLabel(position, instances.length) ? position + 1 : null;
-        const content = (
-          <>
-            <span className="font-semibold">{groupInstanceName(number, instance.openedAt)}</span>
-            <span>· {status.label}</span>
-            <span className="text-gray-500">· {instance.completedSteps}/{instance.totalSteps} steps</span>
-          </>
-        );
-        const chip = `inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs ${colors.bg} ${colors.text}`;
-        if (!selectable) {
-          return <span key={instance.groupInstanceId} className={`${chip} border-gray-200`}>{content}</span>;
-        }
-        const shown = instance.groupInstanceId === shownInstanceId;
-        return (
-          <button
-            key={instance.groupInstanceId}
-            type="button"
-            aria-pressed={shown}
-            title={shown ? 'Its steps are shown below' : 'Show its steps below'}
-            onClick={() => onShow(instance.groupInstanceId)}
-            className={`${chip} ${shown ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-gray-200 opacity-70 hover:opacity-100'}`}
-          >
-            {content}
-          </button>
-        );
-      })}
+    <div className="mt-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {chips.map((n) => {
+          const content = <>{dot(n.instance)}<span>{groupInstanceChipName(n.number, n.instance.openedAt, withYear)}</span></>;
+          if (!selectable) {
+            return <span key={n.instance.groupInstanceId} title={describe(n)} className={`${chipStyle} border-gray-200`}>{content}</span>;
+          }
+          const isShown = n.instance.groupInstanceId === shownInstanceId;
+          return (
+            <button
+              key={n.instance.groupInstanceId}
+              type="button"
+              aria-pressed={isShown}
+              aria-label={describe(n)}
+              title={describe(n)}
+              onClick={() => onShow(n.instance.groupInstanceId)}
+              className={`${chipStyle} ${isShown ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200 hover:bg-gray-50'}`}
+            >
+              {content}
+            </button>
+          );
+        })}
+        {earlier.length > 0 && (
+          <div ref={menuRef} className="relative">
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+              className={`${chipStyle} border-gray-200 text-gray-600 hover:bg-gray-50`}
+            >
+              <ClockIcon aria-hidden className="h-3.5 w-3.5" />
+              {earlier.length} earlier visit{earlier.length > 1 ? 's' : ''}
+              <ChevronDownIcon aria-hidden className="h-3.5 w-3.5" />
+            </button>
+            {menuOpen && (
+              <div role="menu" className="absolute left-0 z-20 mt-1 max-h-64 min-w-[16rem] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                {earlier.map((n) => (
+                  <button
+                    key={n.instance.groupInstanceId}
+                    type="button"
+                    role="menuitem"
+                    aria-label={describe(n)}
+                    onClick={() => { onShow(n.instance.groupInstanceId); setMenuOpen(false); }}
+                    className="flex w-full items-center gap-2 whitespace-nowrap px-3 py-1.5 text-left text-xs hover:bg-gray-50"
+                  >
+                    {dot(n.instance)}
+                    <span className="font-medium text-gray-800">{groupInstanceName(n.number, n.instance.openedAt)}</span>
+                    <span className="ml-auto pl-3 text-gray-500">
+                      {(GROUP_INSTANCE_STATUS[n.instance.status] ?? GROUP_INSTANCE_STATUS.NOT_STARTED).label}
+                      {' · '}{n.instance.completedSteps}/{n.instance.totalSteps}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {shown && <p className="mt-1 text-xs text-gray-500">{selectable ? 'Shown: ' : ''}{describe(shown)}</p>}
     </div>
   );
 }
@@ -378,6 +460,8 @@ export default function PatientDetail() {
               const cycleView = showCycles(journeySteps, cycleSelection);
               const visibleSteps = visibleJourneySteps(cycleView.steps);
               const coversSeveralVisits = journeySteps.some((s) => (s.groupInstances?.length ?? 0) > 1);
+              // The visits with a deviation, at any depth: their chips get a red dot.
+              const deviatedInstanceIds = groupInstancesWithDeviations(protoDeviations);
 
               // The actions to mark with a deviation: the step that is late or missed, and the
               // prerequisites an out-of-order step skipped. Only deviations of step instances in the
@@ -475,6 +559,17 @@ export default function PatientDetail() {
                       </span>
                       <span className="text-xs text-gray-600">Steps that belong together, such as a visit</span>
                     </div>
+                    {coversSeveralVisits && (
+                      <div className="flex items-center gap-3" data-testid="visit-chip-legend">
+                        <span className="text-xs text-gray-600">Visit chips:</span>
+                        {Object.values(CHIP_TONE).map((tone) => (
+                          <span key={tone.label} className="flex items-center gap-1.5">
+                            <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+                            <span className="text-xs text-gray-600">{tone.label}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {deviations.isLoading && <div className="mb-3"><LoadingSpinner /></div>}
@@ -541,6 +636,7 @@ export default function PatientDetail() {
                                 <GroupInstanceList
                                   instances={cycleView.offeredInstances.get(step.actionId)!}
                                   shownInstanceId={cycleView.shownInstances.get(step.actionId)?.groupInstanceId ?? null}
+                                  deviatedInstanceIds={deviatedInstanceIds}
                                   onShow={(groupInstanceId) =>
                                     setCycleSelection((current) => ({ ...current, [step.actionId]: groupInstanceId }))}
                                 />
@@ -593,8 +689,12 @@ export default function PatientDetail() {
                         <div className="md:pr-4">
                           <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Deviations</h4>
                           {protoDeviations.length > 0 ? (
-                            <div className="space-y-2">
-                              {protoDeviations.map((d) => {
+                            <PagedList
+                              key={`deviations-${proto.protocolInstanceId}`}
+                              items={protoDeviations}
+                              pageSize={SIDE_LIST_PAGE_SIZE}
+                              label="Deviations"
+                              renderItem={(d) => {
                                 const visit = groupPathLabel(d.groupPath);
                                 const shown = cycleView.isShown(d.stepInstanceId);
                                 return (
@@ -622,8 +722,8 @@ export default function PatientDetail() {
                                     <p className="text-xs text-gray-500">Detected: {formatDate(d.detectedAt)}</p>
                                   </div>
                                 );
-                              })}
-                            </div>
+                              }}
+                            />
                           ) : (
                             <p className="py-3 text-center text-xs text-gray-400">No deviations found.</p>
                           )}
@@ -632,8 +732,12 @@ export default function PatientDetail() {
                         <div className="mt-4 md:mt-0 md:pl-4">
                           <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Intelligence Alerts</h4>
                           {intelligenceDeliveries.isLoading ? <LoadingSpinner /> : intelligenceDeliveries.error ? <ErrorAlert error={intelligenceDeliveries.error} /> : protoDeliveries.length > 0 ? (
-                            <div className="space-y-2">
-                              {protoDeliveries.map((d) => {
+                            <PagedList
+                              key={`alerts-${proto.protocolInstanceId}`}
+                              items={protoDeliveries}
+                              pageSize={SIDE_LIST_PAGE_SIZE}
+                              label="Intelligence alerts"
+                              renderItem={(d) => {
                                 const delivered = d.status === 'DELIVERED';
                                 const failed = d.status === 'FAILED';
                                 return (
@@ -674,8 +778,8 @@ export default function PatientDetail() {
                                     </div>
                                   </div>
                                 );
-                              })}
-                            </div>
+                              }}
+                            />
                           ) : (
                             <p className="py-3 text-center text-xs text-gray-400">No intelligence alerts found.</p>
                           )}

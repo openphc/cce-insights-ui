@@ -75,23 +75,23 @@ function renderPage() {
 }
 
 describe('PatientDetail — step groups in the Protocol Journey', () => {
-  it('shows a group as a step group, with each of its visits and how many steps are done', () => {
+  it('shows a group as a step group, with a chip per visit, newest first, and how far the shown one is', () => {
     renderPage();
     const visitRow = screen.getByText('Visit').parentElement!.parentElement!;
     expect(within(visitRow).getByText('Step group')).toBeInTheDocument();
-    // Each is named by its number and the day it opened.
-    expect(within(visitRow).getByText('#1 · Nov 2, 2026')).toBeInTheDocument();
-    expect(within(visitRow).getByText('#2 · Nov 3, 2026')).toBeInTheDocument();
-    expect(within(visitRow).getByText('· 2/2 steps')).toBeInTheDocument();
-    expect(within(visitRow).getByText('· 1/2 steps')).toBeInTheDocument();
-    // The row shows the latest visit, which is open, and so does its chip.
+    // Each chip is named by its number and the day it opened, newest first.
+    const chips = within(visitRow).getAllByRole('button').filter((b) => b.hasAttribute('aria-pressed'));
+    expect(chips.map((chip) => chip.textContent)).toEqual(['#2 · Nov 3', '#1 · Nov 2']);
+    expect(chips[1]).toHaveAccessibleName('#1 · Nov 2, 2026 · Completed · 2/2 steps');
+    // The row shows the latest visit, which is open, and the line under the chips says so.
     expect(within(visitRow).getByText('In progress')).toBeInTheDocument();
-    expect(within(visitRow).getByText('· In progress')).toBeInTheDocument();
+    expect(within(visitRow).getByText('Shown: #2 · Nov 3, 2026 · In progress · 1/2 steps')).toBeInTheDocument();
+    expect(screen.getByTestId('visit-chip-legend')).toHaveTextContent('Visit chips:CompletedIn progressHas deviation');
   });
 
   it('shows the latest visit\'s steps first, and another visit\'s steps when its chip is picked', () => {
     renderPage();
-    const chip = (label: string) => screen.getByText(new RegExp(`^${label} ·`)).closest('button')!;
+    const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label} ·`) });
     const bpRow = () => screen.getByText('Blood Pressure').parentElement!.parentElement!;
 
     // Visit #2: history done by Dr. Second, blood pressure still awaited.
@@ -125,6 +125,9 @@ describe('PatientDetail — step groups in the Protocol Journey', () => {
       groupPath: [{ groupActionId: 'visit', groupName: 'Visit', groupInstanceId: 'g0', number: 1, openedAt: '2026-11-02T09:00:00Z' }],
     });
     renderPage();
+    // Visit #1's chip says it has a deviation.
+    expect(screen.getByRole('button', { name: /^#1 ·/ })).toHaveAccessibleName(
+      '#1 · Nov 2, 2026 · Completed · 2/2 steps · has a deviation');
     const card = screen.getByText('Blood Pressure was late').parentElement!;
     expect(within(card).getByText(/In Visit #1 \(Nov 2, 2026\)/)).toBeInTheDocument();
 
@@ -134,5 +137,63 @@ describe('PatientDetail — step groups in the Protocol Journey', () => {
     expect(screen.getByText(/^#1 ·/).closest('button')).toHaveAttribute('aria-pressed', 'true');
     expect(within(card).getByText('· shown above')).toBeInTheDocument();
     deviations.length = 0;
+  });
+
+  it('keeps the latest four visits as chips, and the earlier ones in a menu', () => {
+    const twoVisits = journey[1].groupInstances!;
+    journey[1].groupInstances = Array.from({ length: 7 }, (_, i) => ({
+      groupInstanceId: `g${i}`, cycleIndex: i, status: i < 6 ? 'COMPLETED' as const : 'NOT_STARTED' as const,
+      openedAt: `2026-10-${String(10 + i).padStart(2, '0')}T09:00:00Z`, completedSteps: 2, totalSteps: 2,
+    }));
+    try {
+      renderPage();
+      const chipNames = () => screen.getAllByRole('button').filter((b) => b.hasAttribute('aria-pressed')).map((b) => b.textContent);
+      expect(chipNames()).toEqual(['#7 · Oct 16', '#6 · Oct 15', '#5 · Oct 14', '#4 · Oct 13']);
+
+      fireEvent.click(screen.getByRole('button', { name: '3 earlier visits' }));
+      const menu = screen.getByRole('menu');
+      expect(within(menu).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))).toEqual([
+        '#3 · Oct 12, 2026 · Completed · 2/2 steps',
+        '#2 · Oct 11, 2026 · Completed · 2/2 steps',
+        '#1 · Oct 10, 2026 · Completed · 2/2 steps',
+      ]);
+
+      // Picking one shows it, closes the menu, and gives it a chip of its own.
+      fireEvent.click(within(menu).getByRole('menuitem', { name: /^#2 ·/ }));
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^#2 ·/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(chipNames()).toEqual(['#7 · Oct 16', '#6 · Oct 15', '#5 · Oct 14', '#4 · Oct 13', '#2 · Oct 11']);
+      expect(screen.getByRole('button', { name: '2 earlier visits' })).toBeInTheDocument();
+      expect(screen.getByText('Shown: #2 · Oct 11, 2026 · Completed · 2/2 steps')).toBeInTheDocument();
+
+      // Escape closes the menu.
+      fireEvent.click(screen.getByRole('button', { name: '2 earlier visits' }));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    } finally {
+      journey[1].groupInstances = twoVisits;
+    }
+  });
+
+  it('shows deviations five at a time', () => {
+    for (let i = 1; i <= 7; i++) {
+      deviations.push({
+        deviationId: `d${i}`, protocolInstanceId: 'pi-1', protocolCanonical: 'http://x/PlanDefinition/visits|1.0',
+        stepInstanceId: 'b1', actionId: 'bp', stepName: 'Blood Pressure', deviationType: 'OVERDUE',
+        detectedAt: '2026-11-03T09:00:00Z', description: `Deviation ${i}`,
+      });
+    }
+    try {
+      renderPage();
+      expect(screen.getAllByText(/^Deviation \d$/).map((el) => el.textContent))
+        .toEqual(['Deviation 1', 'Deviation 2', 'Deviation 3', 'Deviation 4', 'Deviation 5']);
+      expect(screen.getByText('1–5 of 7')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next deviations' }));
+
+      expect(screen.getAllByText(/^Deviation \d$/).map((el) => el.textContent)).toEqual(['Deviation 6', 'Deviation 7']);
+    } finally {
+      deviations.length = 0;
+    }
   });
 });
