@@ -60,13 +60,9 @@ export function getDashboardComplianceSummary(params?: {
 
 /** One referral hand-off (a protocol step with a deadline) over the date range; counts are hand-offs. */
 export interface HandoffMetric {
+  /** Stable id of the hand-off: the card's name and description are looked up by it (HANDOFF_CARDS). */
   key: string;
-  label: string;
-  description: string;
   actionId: string;
-  /** Where the patient is handed from and to; the same place for a step within one facility. */
-  fromPlace?: string | null;
-  toPlace?: string | null;
   /** Hand-offs due in the range: completed on time or late, or outstanding. */
   total: number;
   completed: number;

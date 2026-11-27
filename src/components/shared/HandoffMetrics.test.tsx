@@ -6,8 +6,6 @@ import type { HandoffMetric } from '../../api/dashboard';
 
 const handoff = (over: Partial<HandoffMetric>): HandoffMetric => ({
   key: 'k',
-  label: 'Label',
-  description: '',
   actionId: 'a',
   total: 0,
   completed: 0,
@@ -31,10 +29,9 @@ const show = (handoffs: HandoffMetric[]) =>
 describe('HandoffMetrics', () => {
   it('shows each hand-off, in pathway order: how many missed the limit of those due, and the share on time', () => {
     show([
-      handoff({ key: 'first', label: 'Delayed Consultations', total: 10 }),
+      handoff({ key: 'referral-consultation', total: 10 }),
       handoff({
-        key: 'second',
-        label: 'Delayed Acknowledgements',
+        key: 'pci-referral-acknowledged',
         total: 6,
         pending: 1,
         deviations: 4,
@@ -42,12 +39,13 @@ describe('HandoffMetrics', () => {
       }),
     ]);
 
-    const first = screen.getByTestId('handoff-first');
-    expect(within(first).getByText('Delayed Consultations')).toBeInTheDocument();
+    const first = screen.getByTestId('handoff-referral-consultation');
+    expect(within(first).getByText('Delayed UHC Consultations')).toBeInTheDocument();
     expect(within(first).getByText('100.0% on time')).toBeInTheDocument();
     expect(within(first).getByText('/10')).toBeInTheDocument();
 
-    const second = screen.getByTestId('handoff-second');
+    const second = screen.getByTestId('handoff-pci-referral-acknowledged');
+    expect(within(second).getByText('Delayed Cardiac Acknowledgments')).toBeInTheDocument();
     expect(within(second).getByText('20.0% on time')).toBeInTheDocument();
     expect(within(second).getByText('4')).toBeInTheDocument();
     // the one still within its time limit is not due yet
@@ -55,7 +53,12 @@ describe('HandoffMetrics', () => {
   });
 
   it('says when none is due yet', () => {
-    show([handoff({ key: 'p', label: 'Delayed Steps', total: 2, pending: 2 })]);
+    show([handoff({ key: 'p', total: 2, pending: 2 })]);
     expect(screen.getByText('None due yet')).toBeInTheDocument();
+  });
+
+  it('shows the key of a hand-off it has no name for', () => {
+    show([handoff({ key: 'new-handoff', total: 1 })]);
+    expect(screen.getByText('new-handoff')).toBeInTheDocument();
   });
 });

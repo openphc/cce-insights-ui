@@ -77,15 +77,15 @@
 | Non-Compliant Care Journeys | `patients.nonCompliantPatients` | Has active deviations |
 | Active Protocols | `dashboard/compliance-summary → activeProtocols` | Protocols being tracked |
 
-**Referral Hand-off Deviations row** (`components/shared/HandoffMetrics.tsx`, hook `useDashboardHandoffs`): one `MetricCard` per hand-off returned by `dashboard/handoffs`, in the order configured in the service (`cce.insights.handoffs.items`). Refreshes every `VITE_HANDOFF_POLLING_INTERVAL` ms (default 10 s), so a deviation shows shortly after the event that caused it. Grid: 1 column, 2 from `sm`, 3 from `lg`, 5 from `xl`.
+**Referral Hand-off Deviations row** (`components/shared/HandoffMetrics.tsx`, hook `useDashboardHandoffs`): one `MetricCard` per hand-off returned by `dashboard/handoffs`, in the order configured in the service (`cce.insights.handoffs.items`). The service returns only the numbers and each hand-off's `key`; the card's name and ⓘ text are in the UI, in `HANDOFF_CARDS` (keyed by `key`), like the other cards' titles. A key with no entry shows the key itself. Refreshes every `VITE_HANDOFF_POLLING_INTERVAL` ms (default 10 s), so a deviation shows shortly after the event that caused it. Grid: 1 column, 2 from `sm`, 3 from `lg`, 5 from `xl`.
 
 | Card part | Value Source | Description |
 |-----------|-------------|-------------|
-| Title | `label` | e.g. "Delayed ECG Reviewed" |
+| Title | `HANDOFF_CARDS[key].title` | e.g. "Delayed ECG Reviews" |
 | Value | `deviations` | Hand-offs completed late or still overdue |
 | Denominator | `total - pending` | Hand-offs due (judged) in the range |
 | Subtitle | `100 - deviationRate` | "N% on time"; "None due yet" when nothing is due |
-| ⓘ tooltip | `description` | What the hand-off is |
+| ⓘ tooltip | `HANDOFF_CARDS[key].description` | What the hand-off is |
 | Background | | Red when `deviations > 0`, green when hand-offs are due and none deviated |
 
 ---
